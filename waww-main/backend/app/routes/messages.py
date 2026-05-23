@@ -56,6 +56,18 @@ def get_my_messages(
             models.Message.receiver_id == current_user.id
         )
     ).order_by(models.Message.created_at.asc()).all()
+    
+    # Mark messages received by the owner as read
+    unread_messages = db.query(models.Message).filter(
+        models.Message.receiver_id == current_user.id,
+        models.Message.is_read == 0
+    ).all()
+    
+    if unread_messages:
+        for m in unread_messages:
+            m.is_read = 1
+        db.commit()
+        
     return messages
 
 @router.get("/conversations", response_model=List[schemas.ConversationSummary])

@@ -2,14 +2,34 @@ import React from 'react';
 import s from './Reports.module.css';
 
 export default function Reports() {
+  const [period, setPeriod] = React.useState('This Week');
+  const [isOpen, setIsOpen] = React.useState(false);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  const handlePeriodChange = (p) => {
+    setPeriod(p);
+    setIsOpen(false);
+  };
 
   return (
     <div className={s.container}>
       <div className={s.header}>
         <h1>Analytics & Reports</h1>
-        <div className={s.periodSelector}>This Week ▾</div>
+        <div style={{ position: 'relative' }}>
+          <div className={s.periodSelector} onClick={() => setIsOpen(!isOpen)} style={{ cursor: 'pointer' }}>
+            {period} ▾
+          </div>
+          {isOpen && (
+            <div style={{ position: 'absolute', top: '100%', right: 0, background: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 10, minWidth: '120px' }}>
+              {['Today', 'This Week', 'This Month', 'This Year'].map(p => (
+                <div key={p} onClick={() => handlePeriodChange(p)} style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '14px', borderBottom: '1px solid #F3F4F6' }}>
+                  {p}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={s.summaryCards}>

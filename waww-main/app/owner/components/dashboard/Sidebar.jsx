@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import s from './Sidebar.module.css';
+import { LangContext } from './OwnerDashboard';
 
 const Icons = {
   Dashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
@@ -15,21 +16,22 @@ const Icons = {
   LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 };
 
-const NAV_ITEMS = [
-  { id: 'overview', label: 'Dashboard', icon: <Icons.Dashboard /> },
-  { id: 'spaces', label: 'Parking Space', icon: <Icons.ParkingSpace /> },
-  { id: 'reports', label: 'Reports', icon: <Icons.Reports /> },
-  { id: 'payments', label: 'Payment', icon: <Icons.Payment /> },
-  { id: 'reservations', label: 'Reservation', icon: <Icons.Reservation /> },
-  { id: 'pricing', label: 'Pricing', icon: <Icons.Pressing /> },
-  { id: 'access', label: 'Access Control', icon: <Icons.AccessControl /> },
-  { id: 'messaging', label: 'Messaging', icon: <Icons.Messaging /> },
-  { id: 'notifications', label: 'Notifications', icon: <Icons.Notifications /> },
-  { id: 'settings', label: 'Settings', icon: <Icons.Settings /> },
-];
-
 export default function Sidebar({ active, onNavigate, open }) {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { t } = useContext(LangContext);
+
+  const NAV_ITEMS = [
+    { id: 'overview', label: t.dashboard, icon: <Icons.Dashboard /> },
+    { id: 'spaces', label: t.spaces, icon: <Icons.ParkingSpace /> },
+    { id: 'reports', label: t.reports, icon: <Icons.Reports /> },
+    { id: 'payments', label: t.payments, icon: <Icons.Payment /> },
+    { id: 'reservations', label: t.reservations, icon: <Icons.Reservation /> },
+    { id: 'pricing', label: t.pricing, icon: <Icons.Pressing /> },
+    { id: 'access', label: t.access, icon: <Icons.AccessControl /> },
+    { id: 'messaging', label: t.messaging, icon: <Icons.Messaging /> },
+    { id: 'notifications', label: t.notifications || 'Notifications', icon: <Icons.Notifications /> },
+    { id: 'settings', label: t.settings, icon: <Icons.Settings /> },
+  ];
 
   return (
     <>

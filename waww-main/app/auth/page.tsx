@@ -32,8 +32,15 @@ export default function AuthPage() {
   const [ownerForm, setOwnerForm] = useState({ firstName: '', lastName: '', parkingName: '', location: '', spots: '', phone: '', email: '', password: '' });
   const [ownerLogin, setOwnerLogin] = useState({ email: '', password: '' });
 
+  // Admin Login State
+  const [adminLogin, setAdminLogin] = useState({ email: '', password: '' });
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
+  const [adminLoginError, setAdminLoginError] = useState('');
+  const [showAdminPw, setShowAdminPw] = useState(false);
+
   const ownerRegValid = ownerForm.firstName.trim() && ownerForm.lastName.trim() && ownerForm.email.trim() && ownerForm.password.trim();
   const ownerLoginValid = ownerLogin.email.trim() && ownerLogin.password.trim();
+  const adminLoginValid = adminLogin.email.trim() && adminLogin.password.trim();
 
   const handleGoogleSuccess = async (tokenResponse: { access_token: string }) => {
     try {
@@ -131,6 +138,36 @@ export default function AuthPage() {
   const handleGoogleAuth = () => loginWithGoogle();
   const handleGetStarted = () => { router.push('/admin'); };
 
+  const handleAdminLogin = async () => {
+    if (!adminLoginValid) return;
+    setAdminLoginLoading(true);
+    setAdminLoginError('');
+    try {
+      const res = await api.post("/auth/login", {
+        email: adminLogin.email,
+        password: adminLogin.password
+      });
+      localStorage.setItem("gariha_token", res.data.access_token);
+      
+      // Verify the user is actually an admin
+      const userRes = await api.get("/auth/me");
+      const user = userRes.data;
+      
+      if (user.role === "admin") {
+        router.push('/admin');
+      } else {
+        // Not an admin — clear token and show error
+        localStorage.removeItem("gariha_token");
+        setAdminLoginError("This account does not have administrator privileges.");
+        setAdminLoginLoading(false);
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      const errorMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Authentication failed. Please check your credentials.";
+      setAdminLoginError(errorMsg);
+      setAdminLoginLoading(false);
+    }
+  };
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 30 },
@@ -449,129 +486,103 @@ export default function AuthPage() {
                   <div className="w-16 h-16 mx-auto bg-gradient-to-br from-[#0F1E7A] to-[#1A2FA8] rounded-2xl flex items-center justify-center mb-5 shadow-xl shadow-[#0F1E7A]/20">
                     <ShieldCheck size={30} className="text-white" />
                   </div>
-                  <h2 className="text-3xl font-extrabold text-[#0F1E7A] mb-2" style={{ fontFamily: 'var(--font-display)' }}>System Admin</h2>
-                  <p className="text-slate-500 text-sm font-medium">Secure platform administration portal</p>
+                  <h2 className="text-3xl font-extrabold text-[#0F1E7A] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Admin Portal</h2>
+                  <p className="text-slate-500 text-sm font-medium">Sign in with your administrator credentials</p>
                 </div>
 
-                <div className="space-y-6">
-                  
-                  {/* Step 1: Identity */}
-                  <div className={`transition-opacity duration-300 ${googleAuthStatus !== 'idle' ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Step 1</span>
-                      <span className="text-xs font-semibold text-slate-500">Identity Verification</span>
+                {adminLoginError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                     </div>
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input 
-                          type="text" 
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#4DCCE7] focus:ring-2 focus:ring-[#4DCCE7]/20 transition-all outline-none text-sm font-medium" 
-                          placeholder="Admin First Name" 
-                          disabled={googleAuthStatus !== 'idle'}
-                        />
-                      </div>
-                      <div className="relative">
-                        <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input 
-                          type="text" 
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#4DCCE7] focus:ring-2 focus:ring-[#4DCCE7]/20 transition-all outline-none text-sm font-medium" 
-                          placeholder="Admin Last Name" 
-                          disabled={googleAuthStatus !== 'idle'}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    <p className="text-sm font-medium text-red-700">{adminLoginError}</p>
+                  </motion.div>
+                )}
 
-                  <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-6"></div>
-
-                  {/* Step 2: Google Auth */}
+                <div className="space-y-5">
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Step 2</span>
-                      <span className="text-xs font-semibold text-slate-500">Secure Access</span>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Email Address</label>
+                    <div className="relative">
+                      <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="email" 
+                        value={adminLogin.email}
+                        onChange={(e) => { setAdminLogin({...adminLogin, email: e.target.value}); setAdminLoginError(''); }}
+                        className={inputCls}
+                        placeholder="admin@example.com"
+                        disabled={adminLoginLoading}
+                        id="admin-email"
+                      />
                     </div>
-
-                    <AnimatePresence mode="wait">
-                      {googleAuthStatus === 'idle' && (
-                        <motion.div key="google-btn" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-                          <button 
-                            onClick={handleGoogleAuth}
-                            disabled={!canAuthenticate}
-                            className={`w-full flex items-center justify-center gap-3 py-4 rounded-xl border font-bold transition-all duration-300 ${
-                              canAuthenticate 
-                                ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:shadow-md cursor-pointer' 
-                                : 'bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed'
-                            }`}
-                          >
-                            <svg className={`w-5 h-5 ${!canAuthenticate ? 'opacity-50' : ''}`} viewBox="0 0 24 24">
-                              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                            </svg>
-                            Authenticate via Google
-                          </button>
-                          {!canAuthenticate && (
-                            <p className="text-center text-xs text-slate-400 mt-3 font-medium">Please enter your identity above to unlock authentication.</p>
-                          )}
-                        </motion.div>
-                      )}
-
-                      {googleAuthStatus === 'authenticating' && (
-                        <motion.div key="google-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-4 bg-slate-50 rounded-xl border border-slate-100">
-                          <Loader2 className="w-6 h-6 text-[#1A2FA8] animate-spin mb-2" />
-                          <span className="text-sm font-semibold text-[#0F1E7A]">Verifying credentials...</span>
-                        </motion.div>
-                      )}
-
-                      {googleAuthStatus === 'verified' && (
-                        <motion.div key="google-verified" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring" }} className="relative overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#ECFDF5] to-[#D1FAE5] rounded-xl border border-[#A7F3D0] shadow-inner">
-                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", delay: 0.1, bounce: 0.5 }} className="w-12 h-12 bg-[#10B981] rounded-full flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(16,185,129,0.4)]">
-                            <CheckCircle2 size={24} className="text-white" />
-                          </motion.div>
-                          <h4 className="text-[#065F46] font-extrabold text-lg mb-1">Identity Verified</h4>
-                          <p className="text-[#047857] text-xs font-semibold uppercase tracking-widest text-center">Secure Access Granted for {firstName}</p>
-                          
-                          {/* Shimmer effect */}
-                          <motion.div 
-                            className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12"
-                            animate={{ translateX: ['-100%', '200%'] }}
-                            transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
 
-                  {/* Step 3: Action */}
-                  <div className="pt-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Password</label>
+                    <div className="relative">
+                      <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type={showAdminPw ? 'text' : 'password'} 
+                        value={adminLogin.password}
+                        onChange={(e) => { setAdminLogin({...adminLogin, password: e.target.value}); setAdminLoginError(''); }}
+                        className="w-full pl-11 pr-12 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#4DCCE7] focus:ring-2 focus:ring-[#4DCCE7]/20 transition-all outline-none text-sm font-medium"
+                        placeholder="Enter your password"
+                        disabled={adminLoginLoading}
+                        id="admin-password"
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAdminLogin(); }}
+                      />
+                      <button type="button" onClick={() => setShowAdminPw(!showAdminPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        {showAdminPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
                     <button 
-                      onClick={handleGetStarted}
-                      disabled={googleAuthStatus !== 'verified'}
-                      className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-lg transition-all duration-500 shadow-lg ${
-                        googleAuthStatus === 'verified' 
-                          ? 'bg-gradient-to-r from-[#0F1E7A] to-[#1A2FA8] text-white hover:shadow-[0_12px_40px_rgba(15,30,122,0.45)] hover:-translate-y-0.5 cursor-pointer' 
+                      onClick={handleAdminLogin}
+                      disabled={!adminLoginValid || adminLoginLoading}
+                      className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-lg transition-all duration-500 ${
+                        adminLoginValid && !adminLoginLoading
+                          ? 'bg-gradient-to-r from-[#0F1E7A] to-[#1A2FA8] text-white shadow-[0_8px_30px_rgba(15,30,122,0.3)] hover:shadow-[0_12px_40px_rgba(15,30,122,0.45)] hover:-translate-y-0.5 cursor-pointer' 
                           : 'bg-slate-100 text-slate-400 border border-slate-200 shadow-none cursor-not-allowed'
                       }`}
                       style={{ fontFamily: 'var(--font-display)' }}
+                      id="admin-login-btn"
                     >
-                      {googleAuthStatus === 'verified' ? <Lock size={18} className="mr-1" /> : null}
-                      Enter Dashboard
-                      <ChevronRight size={20} className={googleAuthStatus === 'verified' ? 'animate-pulse' : ''} />
+                      {adminLoginLoading ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" />
+                          Authenticating...
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={18} />
+                          Sign In to Dashboard
+                          <ChevronRight size={20} />
+                        </>
+                      )}
                     </button>
-                    {googleAuthStatus === 'verified' && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="text-center text-xs text-slate-500 mt-4 font-medium flex items-center justify-center gap-1.5">
-                        <ShieldCheck size={14} className="text-[#10B981]" />
-                        256-bit AES Encrypted Connection
-                      </motion.p>
-                    )}
                   </div>
 
+                  <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+
+                  <div className="text-center">
+                    <button 
+                      onClick={handleGoogleAuth}
+                      disabled={adminLoginLoading}
+                      className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 hover:shadow-md transition-all duration-300"
+                    >
+                      <GoogleIcon /> Or sign in with Google
+                    </button>
+                  </div>
+
+                  <p className="text-center text-xs text-slate-500 mt-2 font-medium flex items-center justify-center gap-1.5">
+                    <ShieldCheck size={14} className="text-[#10B981]" />
+                    Secure encrypted connection
+                  </p>
                 </div>
               </div>
             </motion.div>
