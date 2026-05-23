@@ -13,20 +13,8 @@ import AccessControl from './AccessControl';
 import Settings from './Settings';
 import Notifications from './Notifications';
 import Messaging from './Messaging';
+import { LangContext, TRANSLATIONS } from './LangContext';
 
-const TRANSLATIONS: Record<string, Record<string, string>> = {
-  en: {
-    dashboard: 'Dashboard', spaces: 'Parking Spaces', reports: 'Reports', payments: 'Payments', reservations: 'Reservations', pricing: 'Pricing', access: 'Access Control', settings: 'Settings', messaging: 'Messaging', logout: 'Log Out', welcome: 'Welcome back', totalSpaces: 'Total Spaces', occupied: 'Occupied', available: 'Available', revenue: 'Monthly Revenue', pending: 'Pending Payments', activeRes: 'Active Reservations',
-  },
-  fr: {
-    dashboard: 'Tableau de bord', spaces: 'Places de parking', reports: 'Rapports', payments: 'Paiements', reservations: 'Réservations', pricing: 'Tarification', access: 'Contrôle d\'accès', settings: 'Paramètres', messaging: 'Messagerie', logout: 'Se déconnecter', welcome: 'Bon retour', totalSpaces: 'Places totales', occupied: 'Occupées', available: 'Disponibles', revenue: 'Revenus mensuels', pending: 'Paiements en attente', activeRes: 'Réservations actives',
-  },
-  ar: {
-    dashboard: 'لوحة التحكم', spaces: 'أماكن الانتظار', reports: 'التقارير', payments: 'المدفوعات', reservations: 'الحجوزات', pricing: 'التسعير', access: 'التحكم في الوصول', settings: 'الإعدادات', messaging: 'الرسائل', logout: 'تسجيل الخروج', welcome: 'مرحباً بعودتك', totalSpaces: 'إجمالي الأماكن', occupied: 'مشغولة', available: 'متاحة', revenue: 'الإيرادات الشهرية', pending: 'مدفوعات معلقة', activeRes: 'الحجوزات النشطة',
-  },
-};
-
-export const LangContext = createContext({ t: TRANSLATIONS.en, lang: 'en', setLang: (_l: string) => {} });
 
 export default function OwnerDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -62,10 +50,16 @@ export default function OwnerDashboard() {
       }
     };
 
-    if (activeSection === 'overview' || !dashboardData) {
-      fetchData();
-    }
-  }, [activeSection]);
+    fetchData();
+
+    const intervalId = setInterval(() => {
+      if (activeSection === 'overview') {
+        fetchData();
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [activeSection, owner]);
 
   const handleSetLang = (l: string) => {
     setLang(l);

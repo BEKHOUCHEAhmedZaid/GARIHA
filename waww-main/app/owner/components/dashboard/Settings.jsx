@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { api } from '@/lib/axios';
 import s from './Settings.module.css';
-import { LangContext } from './OwnerDashboard';
+import { LangContext } from './LangContext';
 
 const NOTIF_ITEMS = [
   { id: 'reservation', label: 'New Reservation', desc: 'When a driver books your space', default: true },
@@ -31,7 +31,7 @@ export default function Settings({ owner }) {
   const [expandedFaq, setExpandedFaq] = useState(null);
   const [expandedPrivacy, setExpandedPrivacy] = useState(null);
 
-  const { lang, setLang } = useContext(LangContext);
+  const { t, lang, setLang } = useContext(LangContext);
 
   const showSnackbar = () => {
     setSnackbar(true);
@@ -39,17 +39,17 @@ export default function Settings({ owner }) {
   };
 
   const tabs = [
-    { id: 'notifications', label: 'Notifications' },
-    { id: 'privacy', label: 'Privacy & Security' },
-    { id: 'language', label: 'Language' },
-    { id: 'help', label: 'Help & Support' },
+    { id: 'notifications', label: t.tabNotifications || 'Notifications' },
+    { id: 'privacy', label: t.tabSecurity || 'Privacy & Security' },
+    { id: 'language', label: t.tabLanguage || 'Language' },
+    { id: 'help', label: t.tabHelp || 'Help & Support' },
   ];
 
   return (
     <div className={s.container}>
       <div className={s.header}>
-        <h1>Settings</h1>
-        <p>Manage your account preferences</p>
+        <h1>{t.settingsTitle || 'Settings'}</h1>
+        <p>{t.settingsDesc || 'Manage your account preferences'}</p>
       </div>
 
       <div className={s.tabs}>
@@ -169,8 +169,8 @@ export default function Settings({ owner }) {
 
         {tab === 'language' && (
           <div className={s.panel}>
-            <h2>Display Language</h2>
-            <p className={s.desc}>Select your preferred language for the dashboard interface.</p>
+            <h2>{t.displayLanguage || 'Display Language'}</h2>
+            <p className={s.desc}>{t.selectLanguageDesc || 'Select your preferred language for the dashboard interface.'}</p>
             <div className={s.langGrid}>
               {LANGUAGES.map(l => (
                 <button
@@ -248,7 +248,7 @@ export default function Settings({ owner }) {
       </div>
 
       {snackbar && (
-        <div className={s.snackbar}>✓ Settings saved</div>
+        <div className={s.snackbar}>✓ {t.settingsSaved || 'Settings saved'}</div>
       )}
     </div>
   );

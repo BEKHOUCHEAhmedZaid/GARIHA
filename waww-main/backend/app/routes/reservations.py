@@ -4,9 +4,23 @@ from typing import List, Any
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app import models, schemas
+from app import models, schemas, auth
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
+
+
+def _create_notification(db: Session, receiver_id: int, title: str, message: str, category: str = "Reservation"):
+    if not receiver_id:
+        return
+    notif = models.Notification(
+        receiver_id=receiver_id,
+        title=title,
+        message=message,
+        category=category,
+        priority="Normal",
+        is_sent=1
+    )
+    db.add(notif)
 
 
 def _expire_stale_reservations(db: Session):
@@ -28,6 +42,13 @@ def _expire_stale_reservations(db: Session):
         spot = db.query(models.ParkingSpot).filter(models.ParkingSpot.id == res.parking_spot_id).first()
         if spot and spot.status == "RESERVEE":
             spot.status = "LIBRE"
+        
+        _create_notification(
+            db,
+            res.driver_id,
+            "Reservation Expired",
+            f"Your reservation for spot {spot.name if spot else 'your spot'} has expired.",
+        )
     if stale:
         db.commit()
 
@@ -55,6 +76,9 @@ def list_public_parkings(db: Session = Depends(get_db)) -> Any:
                 location=p.location,
                 total_places=p.total_places,
                 available_places=libre_count,
+                lat=p.lat,
+                lng=p.lng,
+                pricing=p.pricing,
             )
         )
     return result
@@ -151,6 +175,66 @@ def create_reservation(data: schemas.ReservationCreate, db: Session = Depends(ge
     )
 
 
+@router.post("/driver/create", response_model=schemas.ReservationOut)
+async def create_reservation_authenticated(
+    data: schemas.ReservationCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+) -> Any:
+    """
+    Authenticated driver makes a reservation.
+    """
+    _expire_stale_reservations(db)
+
+    spot = db.query(models.ParkingSpot).filter(models.ParkingSpot.id == data.parking_spot_id).first()
+    if not spot:
+        raise HTTPException(status_code=404, detail="Parking spot not found")
+
+    if spot.status != "LIBRE":
+        raise HTTPException(status_code=409, detail=f"Spot not available (status: {spot.status})")
+
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(minutes=data.duration_minutes)
+
+    reservation = models.Reservation(
+        parking_spot_id=spot.id,
+        driver_id=current_user.id,
+        driver_name=data.driver_name,
+        plate_number=data.plate_number,
+        status="active",
+        expires_at=expires,
+    )
+    spot.status = "RESERVEE"
+
+    db.add(reservation)
+    
+    parking = db.query(models.Parking).filter(models.Parking.id == spot.parking_id).first()
+    _create_notification(
+        db,
+        current_user.id,
+        "Reservation Confirmed",
+        f"Your reservation for spot {spot.name} at {parking.parking_name if parking else 'Parking'} is confirmed.",
+    )
+
+    db.commit()
+    db.refresh(reservation)
+
+    parking = db.query(models.Parking).filter(models.Parking.id == spot.parking_id).first()
+
+    return schemas.ReservationOut(
+        id=reservation.id,
+        parking_spot_id=reservation.parking_spot_id,
+        driver_id=reservation.driver_id,
+        driver_name=reservation.driver_name,
+        plate_number=reservation.plate_number,
+        status=reservation.status,
+        created_at=reservation.created_at,
+        expires_at=reservation.expires_at,
+        spot_name=spot.name,
+        parking_name=parking.parking_name if parking else None,
+    )
+
+
 @router.post("/{reservation_id}/checkin", response_model=schemas.ReservationOut)
 def checkin(reservation_id: int, db: Session = Depends(get_db)) -> Any:
     """Driver arrives — spot becomes OCCUPEE."""
@@ -164,6 +248,13 @@ def checkin(reservation_id: int, db: Session = Depends(get_db)) -> Any:
     spot = db.query(models.ParkingSpot).filter(models.ParkingSpot.id == res.parking_spot_id).first()
     if spot:
         spot.status = "OCCUPEE"
+
+    _create_notification(
+        db,
+        res.driver_id,
+        "Checked In",
+        f"You have successfully checked in to spot {spot.name if spot else 'your spot'}.",
+    )
 
     db.commit()
     db.refresh(res)
@@ -197,6 +288,13 @@ def checkout(reservation_id: int, db: Session = Depends(get_db)) -> Any:
     if spot:
         spot.status = "LIBRE"
 
+    _create_notification(
+        db,
+        res.driver_id,
+        "Checked Out",
+        f"You have successfully checked out of spot {spot.name if spot else 'your spot'}.",
+    )
+
     db.commit()
     db.refresh(res)
 
@@ -228,6 +326,13 @@ def cancel(reservation_id: int, db: Session = Depends(get_db)) -> Any:
     spot = db.query(models.ParkingSpot).filter(models.ParkingSpot.id == res.parking_spot_id).first()
     if spot:
         spot.status = "LIBRE"
+
+    _create_notification(
+        db,
+        res.driver_id,
+        "Reservation Cancelled",
+        f"Your reservation for spot {spot.name if spot else 'your spot'} has been cancelled.",
+    )
 
     db.commit()
     db.refresh(res)

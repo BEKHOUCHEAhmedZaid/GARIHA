@@ -81,8 +81,15 @@ def register_user(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
     if user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    role = "admin" if user_in.email in settings.admin_emails_list else "owner"
-    status_val = "approved" if role == "admin" else "pending"
+    if user_in.email in settings.admin_emails_list:
+        role = "admin"
+        status_val = "approved"
+    elif user_in.parking_name:
+        role = "owner"
+        status_val = "pending"
+    else:
+        role = "driver"
+        status_val = "approved"
     
     hashed_pwd = get_password_hash(user_in.password)
     
@@ -91,6 +98,7 @@ def register_user(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
         full_name=f"{user_in.first_name} {user_in.last_name}",
         hashed_password=hashed_pwd,
         phone=user_in.phone,
+        plate_number=user_in.plate_number,
         role=role,
         status=status_val
     )
@@ -119,7 +127,7 @@ def register_user(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
                     parking_id=new_parking.id,
                     name=f"P{i}",
                     level="Ground",
-                    status="Available",
+                    status="LIBRE",
                     price=250
                 )
                 spots.append(spot)

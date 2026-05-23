@@ -3,10 +3,10 @@ import { api } from '@/lib/axios';
 import s from './ParkingSpaces.module.css';
 
 const STATUS_COLORS = {
-  Available: '#10B981',
-  Reserved: '#4DCCE7',
-  Occupied: '#1A2FA8',
-  Unavailable: '#EF4444',
+  LIBRE: '#10B981',
+  RESERVEE: '#4DCCE7',
+  OCCUPEE: '#1A2FA8',
+  INDISPONIBLE: '#EF4444',
 };
 
 export default function ParkingSpaces({ parkingId }) {
@@ -33,6 +33,8 @@ export default function ParkingSpaces({ parkingId }) {
       }
     };
     fetchSpaces();
+    const intervalId = setInterval(fetchSpaces, 5000);
+    return () => clearInterval(intervalId);
   }, [parkingId]);
 
   // Handle creation of parking if no parkingId exists (creates default parking and spots)
@@ -55,7 +57,7 @@ export default function ParkingSpaces({ parkingId }) {
   const [formData, setFormData] = useState({
     name: getNextSpaceName(),
     level: 'Ground Floor',
-    status: 'Available',
+    status: 'LIBRE',
     price: 250,
   });
 
@@ -63,7 +65,7 @@ export default function ParkingSpaces({ parkingId }) {
     setFormData({
       name: getNextSpaceName(),
       level: 'Ground Floor',
-      status: 'Available',
+      status: 'LIBRE',
       price: 250,
     });
     setEditingSpace(null);
@@ -111,9 +113,9 @@ export default function ParkingSpaces({ parkingId }) {
   };
 
   const toggleAvailability = async (space) => {
-    if (space.status === 'Occupied' || space.status === 'Reserved') return;
+    if (space.status === 'OCCUPEE' || space.status === 'RESERVEE') return;
     
-    const newStatus = space.status === 'Unavailable' ? 'Available' : 'Unavailable';
+    const newStatus = space.status === 'INDISPONIBLE' ? 'LIBRE' : 'INDISPONIBLE';
     try {
       const res = await api.put(`/parking/spots/${space.id}`, 
         { ...space, status: newStatus }
@@ -140,8 +142,8 @@ export default function ParkingSpaces({ parkingId }) {
     );
   }
 
-  const occupiedCount = spaces.filter(s => s.status === 'Occupied').length;
-  const availableCount = spaces.filter(s => s.status === 'Available').length;
+  const occupiedCount = spaces.filter(s => s.status === 'OCCUPEE').length;
+  const availableCount = spaces.filter(s => s.status === 'LIBRE').length;
 
   return (
     <div className={s.container}>
@@ -188,11 +190,11 @@ export default function ParkingSpaces({ parkingId }) {
                       <button 
                         className={s.iconBtn} 
                         onClick={() => toggleAvailability(space)} 
-                        title={space.status === 'Unavailable' ? 'Mark Available' : 'Mark Unavailable'}
-                        disabled={space.status === 'Occupied' || space.status === 'Reserved'}
-                        style={{ opacity: (space.status === 'Occupied' || space.status === 'Reserved') ? 0.5 : 1 }}
+                        title={space.status === 'INDISPONIBLE' ? 'Mark Available' : 'Mark Unavailable'}
+                        disabled={space.status === 'OCCUPEE' || space.status === 'RESERVEE'}
+                        style={{ opacity: (space.status === 'OCCUPEE' || space.status === 'RESERVEE') ? 0.5 : 1 }}
                       >
-                        {space.status === 'Unavailable' ? '✓' : '⊘'}
+                        {space.status === 'INDISPONIBLE' ? '✓' : '⊘'}
                       </button>
                       <button className={s.iconBtn} onClick={() => handleOpenModal(space)} title="Edit Space">✎</button>
                       <button className={s.iconBtnAlert} onClick={() => setDeletingId(space.id)} title="Delete Space">🗑</button>
@@ -238,10 +240,10 @@ export default function ParkingSpaces({ parkingId }) {
             <div className={s.formGroup}>
               <label>Status</label>
               <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-                <option>Available</option>
-                <option>Reserved</option>
-                <option>Occupied</option>
-                <option>Unavailable</option>
+                <option value="LIBRE">Available (LIBRE)</option>
+                <option value="RESERVEE">Reserved (RESERVEE)</option>
+                <option value="OCCUPEE">Occupied (OCCUPEE)</option>
+                <option value="INDISPONIBLE">Unavailable (INDISPONIBLE)</option>
               </select>
             </div>
             <div className={s.formGroup}>

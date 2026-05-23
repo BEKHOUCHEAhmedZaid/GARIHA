@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -14,7 +14,8 @@ class User(Base):
     hashed_password = Column(String, nullable=True)
     avatar = Column(Text, nullable=True)
     phone = Column(String, nullable=True)
-    role = Column(String, default="owner")  # 'admin' or 'owner'
+    plate_number = Column(String, nullable=True)
+    role = Column(String, default="owner")  # 'admin' or 'owner' or 'driver'
     status = Column(String, default="pending")  # 'pending', 'approved', 'rejected'
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -36,6 +37,8 @@ class Parking(Base):
     pricing = Column(Text, nullable=True)
     opening_hours = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
@@ -112,6 +115,7 @@ class Reservation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     parking_spot_id = Column(Integer, ForeignKey("parking_spots.id"), index=True)
+    driver_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     driver_name = Column(String, nullable=False)
     plate_number = Column(String, nullable=False)
     status = Column(String, default="active")  # 'active', 'checked_in', 'completed', 'cancelled', 'expired'
@@ -119,3 +123,4 @@ class Reservation(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     spot = relationship("ParkingSpot", back_populates="reservations")
+    driver = relationship("User", foreign_keys=[driver_id])

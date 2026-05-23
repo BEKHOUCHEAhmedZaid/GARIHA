@@ -4,7 +4,7 @@ import uvicorn
 
 from app.database import init_db
 from app.config import settings
-from app.routes import auth, admin, owner, parking, notifications, messages
+from app.routes import auth, admin, owner, parking, notifications, messages, driver, reservations
 
 # Initialize Database
 init_db()
@@ -18,13 +18,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.FRONTEND_URL,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +31,8 @@ app.include_router(owner.router)
 app.include_router(parking.router)
 app.include_router(notifications.router)
 app.include_router(messages.router)
+app.include_router(driver.router)
+app.include_router(reservations.router)
 
 @app.get("/")
 def root():

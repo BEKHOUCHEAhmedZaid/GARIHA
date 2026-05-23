@@ -32,6 +32,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     phone: Optional[str] = None
+    plate_number: Optional[str] = None
     parking_name: Optional[str] = None
     location: Optional[str] = None
     spots: Optional[int] = 0
@@ -165,6 +166,9 @@ class ParkingPublicOut(BaseModel):
     location: str
     total_places: int
     available_places: int
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    pricing: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -179,6 +183,7 @@ class ReservationCreate(BaseModel):
 class ReservationOut(BaseModel):
     id: int
     parking_spot_id: int
+    driver_id: Optional[int] = None
     driver_name: str
     plate_number: str
     status: str

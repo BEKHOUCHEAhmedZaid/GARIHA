@@ -187,7 +187,7 @@ const LandingPage = () => {
                 Find available spaces in real time or turn your parking spot into an opportunity. Join the future of urban parking today.
               </motion.p>
               <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-                <Link href="/auth" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-[#0F1E7A] to-[#1A2FA8] text-white font-bold text-lg shadow-[0_8px_30px_rgba(15,30,122,0.3)] hover:shadow-[0_12px_40px_rgba(15,30,122,0.45)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2.5 group" style={{ fontFamily: 'var(--font-display)' }}>
+                <Link href="/book" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-[#0F1E7A] to-[#1A2FA8] text-white font-bold text-lg shadow-[0_8px_30px_rgba(15,30,122,0.3)] hover:shadow-[0_12px_40px_rgba(15,30,122,0.45)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2.5 group" style={{ fontFamily: 'var(--font-display)' }}>
                   Find Parking
                   <Search size={18} className="group-hover:scale-110 transition-transform" />
                 </Link>
