@@ -37,13 +37,13 @@ def get_owner_dashboard(
         all_spots.extend(spots)
         
     total_places = len(all_spots)
-    occupied_places = sum(1 for s in all_spots if s.status.lower() == 'occupied')
-    available_places = sum(1 for s in all_spots if s.status.lower() == 'available')
-    unavailable_places = sum(1 for s in all_spots if s.status.lower() == 'unavailable')
-    reservations_count = sum(1 for s in all_spots if s.status.lower() == 'reserved')
+    occupied_places = sum(1 for s in all_spots if s.status.lower() == 'occupee')
+    available_places = sum(1 for s in all_spots if s.status.lower() == 'libre')
+    unavailable_places = sum(1 for s in all_spots if s.status.lower() == 'indisponible')
+    reservations_count = sum(1 for s in all_spots if s.status.lower() == 'reservee')
     
     # Calculate revenue based on occupied and reserved spots price
-    revenue = sum(s.price for s in all_spots if s.status.lower() in ['occupied', 'reserved'])
+    revenue = sum(s.price for s in all_spots if s.status.lower() in ['occupee', 'reservee'])
     
     # Total drivers would be counted from a Reservations table in the future,
     # for now we return the number of currently active clients (occupied + reserved spots)

@@ -34,7 +34,7 @@ def create_parking(
                 parking_id=new_parking.id,
                 name=f"P{i}",
                 level="Ground",
-                status="Available",
+                status="LIBRE",
                 price=250
             )
             spots_to_create.append(spot)

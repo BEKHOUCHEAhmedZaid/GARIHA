@@ -50,10 +50,11 @@ class ParkingSpot(Base):
     parking_id = Column(Integer, ForeignKey("parkings.id"))
     name = Column(String, nullable=False)
     level = Column(String, default="Ground")
-    status = Column(String, default="Available")
+    status = Column(String, default="LIBRE")  # 'LIBRE', 'RESERVEE', 'OCCUPEE'
     price = Column(Integer, default=250)
 
     parking = relationship("Parking", back_populates="spots")
+    reservations = relationship("Reservation", back_populates="spot")
 
 
 
@@ -104,3 +105,17 @@ class Message(Base):
 
     sender = relationship("User", foreign_keys=[sender_id])
     receiver = relationship("User", foreign_keys=[receiver_id])
+
+
+class Reservation(Base):
+    __tablename__ = "reservations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    parking_spot_id = Column(Integer, ForeignKey("parking_spots.id"), index=True)
+    driver_name = Column(String, nullable=False)
+    plate_number = Column(String, nullable=False)
+    status = Column(String, default="active")  # 'active', 'checked_in', 'completed', 'cancelled', 'expired'
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    spot = relationship("ParkingSpot", back_populates="reservations")

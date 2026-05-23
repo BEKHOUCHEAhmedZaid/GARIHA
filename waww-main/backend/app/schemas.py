@@ -81,7 +81,7 @@ class ParkingOut(ParkingBase):
 class ParkingSpotBase(BaseModel):
     name: str
     level: str = "Ground"
-    status: str = "Available"
+    status: str = "LIBRE"
     price: int = 250
 
 class ParkingSpotOut(ParkingSpotBase):
@@ -157,3 +157,35 @@ class ConversationSummary(BaseModel):
     last_message: str
     last_message_time: datetime
     unread_count: int
+
+
+class ParkingPublicOut(BaseModel):
+    id: int
+    parking_name: str
+    location: str
+    total_places: int
+    available_places: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReservationCreate(BaseModel):
+    parking_spot_id: int
+    driver_name: str
+    plate_number: str
+    duration_minutes: int = 60  # default 1 hour
+
+
+class ReservationOut(BaseModel):
+    id: int
+    parking_spot_id: int
+    driver_name: str
+    plate_number: str
+    status: str
+    created_at: datetime
+    expires_at: datetime
+    spot_name: Optional[str] = None
+    parking_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
