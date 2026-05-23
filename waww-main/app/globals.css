@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1A2FA8;
+  --color-primary-deep: #0F1E7A;
+  --color-accent: #4DCCE7;
+  --color-accent-light: #7DDFF0;
+  --color-surface: #F7F8FC;
+  --color-surface-2: #EAEDF7;
+
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+/* Base resets */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection color branding */
+::selection {
+  background: rgba(77, 204, 231, 0.25);
+  color: #0F1E7A;
+}
+
+/* Premium noise texture overlay — subtle grain for depth */
+.premium-noise::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.018;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Smooth section flow connectors */
+.section-bridge {
+  position: relative;
+}
+.section-bridge::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, transparent, var(--bridge-to, #F7F8FC));
+  pointer-events: none;
+  z-index: 1;
+}

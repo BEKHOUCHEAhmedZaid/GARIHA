@@ -1,0 +1,165 @@
+
+
+.emptyState {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 64px 24px; text-align: center;
+  gap: 12px;
+}
+.emptyIcon { font-size: 48px; margin-bottom: 8px; opacity: 0.4; }
+.emptyTitle { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 18px; color: #12183A; }
+.emptyText { font-size: 14px; color: #6B7280; max-width: 340px; line-height: 1.6; }
+
+.shell {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-surface, #F7F8FC);
+}
+
+.content {
+  overflow-y: auto;
+  height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 40px;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.realLogo {
+  height: 38px; /* Slightly increased to match badge proportion */
+  width: auto;
+  object-fit: contain;
+}
+
+.brandBadgeRole {
+  background: linear-gradient(90deg, #4BCFE7, #182FB0);
+  color: white;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 6px 18px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(24, 47, 176, 0.25);
+}
+
+.topbarProfile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tpInfo {
+  text-align: right;
+}
+
+.tpName {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #12183A;
+  margin: 0 0 4px 0;
+}
+
+.tpStatus {
+  font-size: 13px;
+  color: #6B7280;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  background: #10B981;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.tpAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4BCFE7, #182FB0);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 4px 14px rgba(24, 47, 176, 0.2);
+}
+
+.pageContent {
+  flex: 1;
+  padding: 0;
+}
+
+.burger {
+  display: none;
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
+  background: #1A2FA8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 20px;
+}
+
+.overlay {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .shell {
+    grid-template-columns: 60px 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .shell {
+    display: block;
+  }
+  .burger {
+    display: block;
+  }
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 40;
+  }
+}
+
+@media (max-width: 480px) {
+  .emptyState {
+    padding: 32px 16px;
+  }
+}

@@ -1,0 +1,269 @@
+
+
+.emptyState { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 24px; text-align: center; gap: 12px; }
+.emptyIcon { font-size: 48px; margin-bottom: 8px; opacity: 0.4; }
+.emptyTitle { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 18px; color: #12183A; }
+.emptyText { font-size: 14px; color: #6B7280; max-width: 340px; line-height: 1.6; }
+
+.container {
+  padding: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+}
+
+.header h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  color: var(--color-text, #12183A);
+  margin: 0 0 8px 0;
+}
+
+.header p {
+  color: var(--color-text-muted, #6B7280);
+  font-size: 15px;
+  margin: 0;
+}
+
+.addBtn {
+  background: linear-gradient(135deg, #1A2FA8, #4DCCE7);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(26, 47, 168, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.addBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(26, 47, 168, 0.14);
+}
+
+.tableContainer {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(26, 47, 168, 0.08);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th, .table td {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-surface-2, #EAEDF7);
+}
+
+.table th {
+  color: var(--color-text-muted, #6B7280);
+  font-weight: 500;
+  font-size: 14px;
+  background: rgba(234, 237, 247, 0.3);
+}
+
+.table td {
+  color: var(--color-text, #12183A);
+  font-size: 15px;
+}
+
+.fw600 {
+  font-weight: 600;
+}
+
+.statusBadge {
+  padding: 4px 12px;
+  border-radius: 40px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.actionsCol {
+  text-align: right;
+}
+
+.iconBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #6B7280);
+  font-size: 16px;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.iconBtn:hover {
+  background: var(--color-surface-2, #EAEDF7);
+  color: var(--color-primary, #1A2FA8);
+}
+
+.iconBtnAlert {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #6B7280);
+  font-size: 16px;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.iconBtnAlert:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error, #EF4444);
+}
+
+.deleteRow td {
+  background: rgba(239, 68, 68, 0.05);
+  padding: 12px 24px;
+}
+
+.deleteConfirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-error, #EF4444);
+  font-weight: 600;
+}
+
+.deleteActions {
+  display: flex;
+  gap: 12px;
+}
+
+.cancelDelBtn {
+  background: white;
+  border: 1px solid var(--color-surface-2, #EAEDF7);
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.confirmDelBtn {
+  background: var(--color-error, #EF4444);
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 24, 58, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 14px;
+  padding: 32px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 28px rgba(26, 47, 168, 0.14);
+}
+
+.modal h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  color: var(--color-text, #12183A);
+  margin: 0 0 24px 0;
+}
+
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text, #12183A);
+  margin-bottom: 8px;
+}
+
+.formGroup input, .formGroup select {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--color-surface-2, #EAEDF7);
+  border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.formGroup input:focus, .formGroup select:focus {
+  border-color: var(--color-accent, #4DCCE7);
+}
+
+.inputWithSuffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputWithSuffix input {
+  padding-right: 80px;
+}
+
+.suffix {
+  position: absolute;
+  right: 12px;
+  color: var(--color-text-muted, #6B7280);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.modalActions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.cancelBtn {
+  background: var(--color-surface-2, #EAEDF7);
+  border: none;
+  color: var(--color-text, #12183A);
+}
+
+.saveBtn {
+  background: linear-gradient(135deg, #1A2FA8, #4DCCE7);
+  border: none;
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 24px 16px;
+    padding-top: 72px;
+  }
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}

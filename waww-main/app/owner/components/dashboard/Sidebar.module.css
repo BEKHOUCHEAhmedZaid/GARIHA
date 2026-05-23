@@ -1,0 +1,218 @@
+
+
+.sidebar {
+  background: linear-gradient(180deg, #4BCFE7 0%, #182FB0 100%);
+  width: 80px;
+  height: calc(100vh - 24px);
+  margin: 12px 0 12px 12px;
+  border-radius: 28px;
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
+  box-shadow: 0 8px 40px rgba(24, 47, 176, 0.30);
+}
+
+.nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  overflow-y: auto;
+}
+/* hide scrollbar */
+.nav::-webkit-scrollbar { width: 0; }
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 64px;
+  padding: 10px 4px;
+  border-radius: 16px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  cursor: pointer;
+}
+
+.navItem.active {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: scale(1.02);
+}
+
+.navItem:hover:not(.active) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.02);
+}
+
+.navIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.navLabel {
+  font-family: 'Outfit', sans-serif;
+  font-size: 8.5px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+}
+
+.navItem.active .navIcon,
+.navItem:hover .navIcon {
+  opacity: 1;
+}
+
+.bottomBlock {
+  margin-top: auto;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.logout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 64px;
+  padding: 10px 4px;
+  background: transparent;
+  border: none;
+  color: #ffffff; /* Default state white text */
+  border-radius: 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.logoutIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  opacity: 1; /* Default state white icon */
+  transition: all 0.2s ease;
+}
+
+.logout:hover {
+  color: #ef4444; /* text becomes red */
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.02);
+}
+
+.logout:hover .logoutIcon {
+  color: #ef4444; /* icon becomes red */
+}
+
+/* Modal styles preserved */
+.overlayModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #09090b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 32px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.modal h3 {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 20px;
+  color: #fafafa;
+  margin: 0 0 12px 0;
+}
+
+.modal p {
+  color: #a1a1aa;
+  font-size: 14px;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+}
+
+.modalActions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.cancelBtn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fafafa;
+}
+
+.cancelBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.confirmLogout {
+  background: #ef4444;
+  border: none;
+  color: white;
+}
+
+.confirmLogout:hover {
+  background: #dc2626;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .sidebar { width: 60px; }
+  .brandBlock, .navLabel { display: none; }
+  .navItem { justify-content: center; padding: 12px 0; }
+  .logout { justify-content: center; padding: 12px 0; }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -220px;
+    width: 220px;
+  }
+  .sidebar.open { left: 0; }
+  .brandBlock, .navLabel { display: flex; }
+  .navItem, .logout { justify-content: flex-start; padding: 10px 12px; }
+}
