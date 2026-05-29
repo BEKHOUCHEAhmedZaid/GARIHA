@@ -9,21 +9,21 @@ import { useRouter } from "next/navigation";
 
 export default function BookingPage() {
   const router = useRouter();
-  const [parkings, setParkings] = useState([]);
+  const [parkings, setParkings] = useState<any[]>([]);
   const [loadingParkings, setLoadingParkings] = useState(true);
   
-  const [selectedParking, setSelectedParking] = useState(null);
-  const [spots, setSpots] = useState([]);
+  const [selectedParking, setSelectedParking] = useState<any>(null);
+  const [spots, setSpots] = useState<any[]>([]);
   const [loadingSpots, setLoadingSpots] = useState(false);
   
-  const [selectedSpot, setSelectedSpot] = useState(null);
+  const [selectedSpot, setSelectedSpot] = useState<any>(null);
   const [driverName, setDriverName] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
   const [duration, setDuration] = useState("60");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   
-  const [successReservation, setSuccessReservation] = useState(null);
+  const [successReservation, setSuccessReservation] = useState<any>(null);
 
   useEffect(() => {
     fetchParkings();
@@ -48,7 +48,7 @@ export default function BookingPage() {
     setErrorMsg("");
     try {
       const res = await api.get(`/reservations/public/parkings/${parking.id}/spots`);
-      setSpots(res.data); // this route only returns LIBRE spots
+      setSpots(res.data);
     } catch (e) {
       console.error(e);
       setErrorMsg("Failed to load parking spots");
@@ -74,11 +74,10 @@ export default function BookingPage() {
         duration_minutes: parseInt(duration)
       });
       setSuccessReservation(res.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       if (err.response?.status === 409) {
         setErrorMsg(err.response.data.detail || "This spot is no longer available. Please select another one.");
-        // Refresh spots
         if (selectedParking) handleSelectParking(selectedParking);
         setSelectedSpot(null);
       } else {
@@ -166,7 +165,6 @@ export default function BookingPage() {
         )}
 
         <div className="flex flex-col lg:flex-row gap-8 w-full">
-          {/* Left Column: Parkings List */}
           <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="lg:w-1/2 flex flex-col gap-4">
             <h2 className="text-lg font-bold text-[#0F1E7A] px-2" style={{ fontFamily: 'var(--font-display)' }}>Available Parkings</h2>
             
@@ -180,7 +178,7 @@ export default function BookingPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {parkings.map(p => (
+                {parkings.map((p: any) => (
                   <button 
                     key={p.id}
                     onClick={() => handleSelectParking(p)}
@@ -206,7 +204,6 @@ export default function BookingPage() {
             )}
           </motion.div>
 
-          {/* Right Column: Spots & Reservation Form */}
           <AnimatePresence mode="wait">
             {selectedParking && (
               <motion.div key={selectedParking.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="lg:w-1/2 flex flex-col gap-6">
@@ -224,7 +221,7 @@ export default function BookingPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 gap-3 mb-8">
-                      {spots.map(s => (
+                      {spots.map((s: any) => (
                         <button
                           key={s.id}
                           onClick={() => setSelectedSpot(s)}
