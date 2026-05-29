@@ -41,7 +41,7 @@ export default function BookingPage() {
     }
   };
 
-  const handleSelectParking = async (parking) => {
+  const handleSelectParking = async (parking: any) => {
     setSelectedParking(parking);
     setSelectedSpot(null);
     setLoadingSpots(true);
