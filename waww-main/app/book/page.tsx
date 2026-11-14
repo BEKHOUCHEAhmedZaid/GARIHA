@@ -243,9 +243,13 @@ export default function BookingPage() {
             <Link href="/track" className="flex items-center gap-2 text-sm font-bold text-[#1A2FA8] bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-200 hover:shadow-sm transition-all">
               <Car size={16} /> Suivi de ma réservation
             </Link>
-            {currentUser && (
-              <Link href="/driver" className="hidden sm:flex items-center gap-2 text-sm font-bold text-slate-700 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-200 hover:shadow-sm transition-all">
+            {currentUser ? (
+              <Link href="/auth" className="hidden sm:flex items-center gap-2 text-sm font-bold text-slate-700 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-200 hover:shadow-sm transition-all">
                 <User size={16} /> Mon Compte
+              </Link>
+            ) : (
+              <Link href="/auth" className="hidden sm:flex items-center gap-2 text-sm font-bold text-slate-700 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-200 hover:shadow-sm transition-all">
+                <User size={16} /> Connexion
               </Link>
             )}
           </div>

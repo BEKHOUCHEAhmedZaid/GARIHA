@@ -548,13 +548,17 @@ export default function AdminDashboard() {
     const fetchUser = async () => {
       try {
         const res = await api.get("/auth/me");
+        if (res.data.role !== "admin") {
+          router.replace("/auth?role=admin");
+          return;
+        }
         setCurrentUser(res.data);
       } catch {
-        console.error("Not logged in");
+        router.replace("/auth?role=admin");
       }
     };
     fetchUser();
-  }, []);
+  }, [router]);
 
   const getInitials = (name: string) => {
     if (!name) return "SA";

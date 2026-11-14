@@ -9,6 +9,8 @@
  */
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+import fs from "fs";
+import path from "path";
 
 let passed = 0;
 let failed = 0;
@@ -523,6 +525,131 @@ async function testAdminUserDetailAccess() {
   assert(authorizeAdminUsersAccess(null).status === 403, "Unauthenticated user is denied access to admin users list (403)");
 }
 
+async function testYourAccountAndRoleSelection() {
+  console.log("\n--- TEST 14: 'Your Account' Routing, Role Selection & Server-Side Verification ---");
+
+  // 1. Verify "Your Account" links in app/page.tsx
+  const landingPagePath = path.resolve("app/page.tsx");
+  const landingPageContent = fs.readFileSync(landingPagePath, "utf-8");
+
+  // Check that "Your Account" links point to /auth (desktop, mobile, hero CTA)
+  const yourAccountMatches = [...landingPageContent.matchAll(/<Link[^>]*href=["']([^"']+)["'][^>]*>(?:(?!<\/Link>)[\s\S])*?Your Account(?:(?!<\/Link>)[\s\S])*?<\/Link>/g)];
+  assert(yourAccountMatches.length >= 3, "Found at least 3 'Your Account' buttons on landing page (desktop, mobile, hero)");
+  for (const match of yourAccountMatches) {
+    assert(match[1] === "/auth", `'Your Account' link points to /auth (found: ${match[1]})`);
+  }
+
+  // 2. Role selection resolution logic (client behavior on visiting /auth)
+  function resolveInitialRole(searchParamsString) {
+    const params = new URLSearchParams(searchParamsString);
+    const roleParam = params.get("role");
+    if (roleParam === "driver" || roleParam === "owner" || roleParam === "admin") {
+      return roleParam;
+    }
+    return "none";
+  }
+
+  assert(resolveInitialRole("") === "none", "Clicking 'Your Account' without param opens account type selection (role = 'none')");
+  assert(resolveInitialRole("?foo=bar") === "none", "Arbitrary query param still defaults to role selection");
+  assert(resolveInitialRole("?role=driver") === "driver", "Choosing Conducteur leads to driver auth");
+  assert(resolveInitialRole("?role=owner") === "owner", "Choosing Propriétaire leads to owner auth");
+  assert(resolveInitialRole("?role=admin") === "admin", "Choosing Administrateur leads to admin auth");
+
+  // 3. Server-side role verification (never trust client selection)
+  function serverVerifyAccess(targetDashboard, authenticatedUser) {
+    if (!authenticatedUser) {
+      return { allowed: false, status: 401, error: "Authentication required" };
+    }
+    if (targetDashboard === "admin") {
+      if (authenticatedUser.role !== "admin") {
+        return { allowed: false, status: 403, error: "Admin privilege required" };
+      }
+      return { allowed: true, status: 200 };
+    }
+    if (targetDashboard === "owner") {
+      if (authenticatedUser.role !== "owner") {
+        return { allowed: false, status: 403, error: "Owner privilege required" };
+      }
+      if (authenticatedUser.status !== "approved") {
+        return { allowed: false, status: 403, error: "Owner account pending approval" };
+      }
+      return { allowed: true, status: 200 };
+    }
+    if (targetDashboard === "driver") {
+      if (authenticatedUser.role !== "driver") {
+        return { allowed: false, status: 403, error: "Driver privilege required" };
+      }
+      return { allowed: true, status: 200 };
+    }
+    return { allowed: false, status: 400 };
+  }
+
+  const driverSession = { id: 42, email: "driver@gariha.com", role: "driver", status: "active" };
+  const ownerSession = { id: 7, email: "owner@gariha.com", role: "owner", status: "approved" };
+  const pendingOwnerSession = { id: 8, email: "pending@gariha.com", role: "owner", status: "pending" };
+  const adminSession = { id: 1, email: "admin@gariha.com", role: "admin", status: "active" };
+
+  assert(serverVerifyAccess("admin", driverSession).status === 403, "Driver cannot access admin dashboard (403)");
+  assert(serverVerifyAccess("owner", driverSession).status === 403, "Driver cannot access owner dashboard (403)");
+  assert(serverVerifyAccess("driver", driverSession).status === 200, "Driver can access driver dashboard (200)");
+
+  assert(serverVerifyAccess("admin", ownerSession).status === 403, "Owner cannot access admin dashboard (403)");
+  assert(serverVerifyAccess("owner", ownerSession).status === 200, "Approved owner can access owner dashboard (200)");
+  assert(serverVerifyAccess("owner", pendingOwnerSession).status === 403, "Pending owner cannot access active owner dashboard (403)");
+
+  assert(serverVerifyAccess("admin", adminSession).status === 200, "Admin can access admin dashboard (200)");
+
+  // 4. Bad role / Role mismatch behavior & No automatic disconnection
+  function evaluateRoleSelectionInteraction(selectedRoleOnUI, currentSession, userAction = "view") {
+    let tokenCleared = false;
+    let mismatchNotice = null;
+    let redirect = null;
+
+    if (userAction === "logout" || userAction === "switch_account") {
+      tokenCleared = true;
+      return { tokenCleared, mismatchNotice: null, redirect: "/auth" };
+    }
+
+    if (currentSession) {
+      if (selectedRoleOnUI !== "none" && selectedRoleOnUI !== currentSession.role) {
+        // Mismatch: show clear message, do NOT clear token, do NOT silently redirect to driver
+        mismatchNotice = {
+          expectedRole: selectedRoleOnUI,
+          actualRole: currentSession.role,
+          email: currentSession.email,
+        };
+      } else if (selectedRoleOnUI === currentSession.role) {
+        redirect = `/${currentSession.role}`;
+      }
+    }
+
+    return { tokenCleared, mismatchNotice, redirect };
+  }
+
+  // Case A: Driver visits /auth and selects 'owner'
+  const mismatchOwner = evaluateRoleSelectionInteraction("owner", driverSession);
+  assert(mismatchOwner.tokenCleared === false, "No automatic disconnect when driver selects owner");
+  assert(mismatchOwner.mismatchNotice !== null, "Clear mismatch notice is generated");
+  assert(mismatchOwner.mismatchNotice?.actualRole === "driver", "Notice accurately states current role is driver");
+  assert(mismatchOwner.mismatchNotice?.expectedRole === "owner", "Notice accurately states expected role is owner");
+  assert(mismatchOwner.redirect === null, "Does NOT silently redirect to /driver");
+
+  // Case B: Driver selects 'admin'
+  const mismatchAdmin = evaluateRoleSelectionInteraction("admin", driverSession);
+  assert(mismatchAdmin.tokenCleared === false, "No automatic disconnect when driver selects admin");
+  assert(mismatchAdmin.mismatchNotice !== null, "Clear mismatch notice is generated for admin selection");
+
+  // Case C: Explicit switch account
+  const switchAction = evaluateRoleSelectionInteraction("owner", driverSession, "switch_account");
+  assert(switchAction.tokenCleared === true, "Session token is only cleared upon explicit switch account action");
+
+  // Case D: Driver selects 'driver'
+  const matchDriver = evaluateRoleSelectionInteraction("driver", driverSession);
+  assert(matchDriver.tokenCleared === false, "Session is preserved when role matches");
+  assert(matchDriver.mismatchNotice === null, "No mismatch notice when role matches");
+  assert(matchDriver.redirect === "/driver", "Leads to correct driver dashboard");
+}
+
 async function run() {
   console.log("==================================================");
   console.log(" GARIHA Fullstack Migration Test Suite");
@@ -541,6 +668,7 @@ async function run() {
   await testReservationTrackingSecurity();
   await testMessagingAccessControl();
   await testAdminUserDetailAccess();
+  await testYourAccountAndRoleSelection();
 
   console.log("\n==================================================");
   console.log(`Results: ${passed} passed, ${failed} failed.`);

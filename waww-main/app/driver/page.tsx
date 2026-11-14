@@ -185,6 +185,11 @@ export default function DriverDashboard() {
         const userRes = await api.get("/auth/me");
         if (!isMounted) return;
 
+        if (userRes.data.role !== "driver") {
+          router.replace("/auth?role=driver");
+          return;
+        }
+
         setIsAuthenticated(true);
         setUser(userRes.data);
         setProfileForm(prev => ({
@@ -225,7 +230,7 @@ export default function DriverDashboard() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [refreshTick]);
+  }, [refreshTick, router]);
 
   // 2. Load conversations & contacts when Messaging tab is opened
   useEffect(() => {

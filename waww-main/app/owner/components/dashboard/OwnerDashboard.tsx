@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/axios';
 import s from './OwnerDashboard.module.css';
 import Sidebar from './Sidebar';
@@ -43,6 +44,7 @@ export default function OwnerDashboard() {
     return 'en';
   });
 
+  const router = useRouter();
   const [owner, setOwner] = useState<OwnerUser | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +56,10 @@ export default function OwnerDashboard() {
         // Fetch user profile only if it's missing (initial load)
         if (!owner) {
           const userRes = await api.get('/auth/me');
+          if (userRes.data.role !== 'owner') {
+            router.replace('/auth?role=owner');
+            return;
+          }
           setOwner(userRes.data);
         }
 
@@ -62,6 +68,10 @@ export default function OwnerDashboard() {
         setDashboardData(dashRes.data);
       } catch (err) {
         console.error("Failed to fetch backend data", err);
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 401 || status === 403) {
+          router.replace('/auth?role=owner');
+        }
       } finally {
         setLoading(false);
       }
@@ -76,7 +86,7 @@ export default function OwnerDashboard() {
     }, 5000);
 
     return () => clearInterval(intervalId);
-  }, [activeSection, owner]);
+  }, [activeSection, owner, router]);
 
   const handleSetLang = (l: string) => {
     setLang(l);

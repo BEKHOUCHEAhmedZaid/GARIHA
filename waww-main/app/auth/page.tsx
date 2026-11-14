@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -31,16 +31,62 @@ export default function AuthPage() {
     return 'none';
   });
 
+  const getRoleLabel = (r?: string) => {
+    if (r === 'admin') return 'Administrateur';
+    if (r === 'owner') return 'Propriétaire';
+    if (r === 'driver') return 'Conducteur';
+    return r || '';
+  };
+
   const getRedirectUrl = (defaultUrl: string) => {
     if (typeof window === 'undefined') return defaultUrl;
     const redirect = new URLSearchParams(window.location.search).get('redirect');
     return redirect && redirect.startsWith('/') ? redirect : defaultUrl;
   };
   
+  // Session & Role Mismatch State
+  const [currentUser, setCurrentUser] = useState<{ id: number; full_name: string; email: string; role: string; status?: string } | null>(null);
+  const [roleMismatchNotice, setRoleMismatchNotice] = useState<{
+    expectedRole: string;
+    actualRole: string;
+    email: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkActiveSession = async () => {
+      if (typeof window === 'undefined') return;
+      const token = localStorage.getItem("gariha_token");
+      if (!token) return;
+      try {
+        const res = await api.get("/auth/me");
+        if (isMounted) {
+          setCurrentUser(res.data);
+        }
+      } catch (err) {
+        console.error("Session check error", err);
+      }
+    };
+    checkActiveSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSwitchAccount = () => {
+    localStorage.removeItem("gariha_token");
+    setCurrentUser(null);
+    setRoleMismatchNotice(null);
+  };
+
+  const handleGoToRoleDashboard = (targetRole: string) => {
+    if (targetRole === 'admin') router.push(getRedirectUrl('/admin'));
+    else if (targetRole === 'owner') router.push(getRedirectUrl('/owner'));
+    else router.push(getRedirectUrl('/driver'));
+  };
+
   // Auth State
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [googleAuthStatus, setGoogleAuthStatus] = useState<'idle' | 'authenticating' | 'verified'>('idle');
+  const [, setGoogleAuthStatus] = useState<'idle' | 'authenticating' | 'verified'>('idle');
   const [ownerTab, setOwnerTab] = useState<'register' | 'login'>('register');
   const [ownerStep, setOwnerStep] = useState<'form' | 'submitting' | 'pending' | 'approved'>('form');
   const [showPw, setShowPw] = useState(false);
@@ -69,31 +115,50 @@ export default function AuthPage() {
     try {
       if (role === 'owner') setOwnerStep('submitting');
       else setGoogleAuthStatus('authenticating');
+      setRoleMismatchNotice(null);
 
       const res = await api.post("/auth/google-login", { token: tokenResponse.access_token });
       localStorage.setItem("gariha_token", res.data.access_token);
       
       const userRes = await api.get("/auth/me");
       const user = userRes.data;
+      setCurrentUser(user);
       
-      if (user.role === "admin") {
-         if (role !== 'admin') {
-           setRole('admin');
-         }
-         setGoogleAuthStatus('verified');
-         setTimeout(() => router.push(getRedirectUrl('/admin')), 1000);
-      } else if (user.role === "driver") {
-         router.push(getRedirectUrl('/driver'));
-      } else {
-         if (role === 'admin') {
-           alert("You do not have admin privileges. Redirecting to owner portal.");
-           setRole('owner');
-         }
-         if (user.status === "approved") {
+      if (role === 'none') {
+        if (user.role === "admin") {
+          setGoogleAuthStatus('verified');
+          setTimeout(() => router.push(getRedirectUrl('/admin')), 800);
+        } else if (user.role === "owner") {
+          if (user.status === "approved") {
             router.push(getRedirectUrl('/owner'));
-         } else {
+          } else {
+            setRole('owner');
             setOwnerStep('pending');
-         }
+          }
+        } else {
+          router.push(getRedirectUrl('/driver'));
+        }
+      } else if (role === user.role) {
+        if (user.role === "admin") {
+          setGoogleAuthStatus('verified');
+          setTimeout(() => router.push(getRedirectUrl('/admin')), 800);
+        } else if (user.role === "owner") {
+          if (user.status === "approved") {
+            router.push(getRedirectUrl('/owner'));
+          } else {
+            setOwnerStep('pending');
+          }
+        } else {
+          router.push(getRedirectUrl('/driver'));
+        }
+      } else {
+        if (role === 'owner') setOwnerStep('form');
+        else setGoogleAuthStatus('idle');
+        setRoleMismatchNotice({
+          expectedRole: role,
+          actualRole: user.role,
+          email: user.email,
+        });
       }
     } catch (err) {
       console.error(err);
@@ -142,6 +207,7 @@ export default function AuthPage() {
     }
     setDriverLoading(true);
     setDriverError('');
+    setRoleMismatchNotice(null);
     try {
       const res = await api.post("/auth/login", {
         email: driverLogin.email,
@@ -149,12 +215,18 @@ export default function AuthPage() {
       });
       localStorage.setItem("gariha_token", res.data.access_token);
       const userRes = await api.get("/auth/me");
-      if (userRes.data.role === "admin") {
-        router.push(getRedirectUrl('/admin'));
-      } else if (userRes.data.role === "owner") {
-        router.push(getRedirectUrl('/owner'));
-      } else {
+      const user = userRes.data;
+      setCurrentUser(user);
+
+      if (user.role === "driver") {
         router.push(getRedirectUrl('/driver'));
+      } else {
+        // Account has a different role: do NOT silently redirect or wipe token
+        setRoleMismatchNotice({
+          expectedRole: 'driver',
+          actualRole: user.role,
+          email: user.email,
+        });
       }
     } catch (err: unknown) {
       console.error(err);
@@ -191,6 +263,7 @@ export default function AuthPage() {
   const handleOwnerLogin = async () => {
     if (!ownerLoginValid) return;
     setOwnerStep('submitting');
+    setRoleMismatchNotice(null);
     try {
       const payload = {
         email: ownerLogin.email,
@@ -201,15 +274,22 @@ export default function AuthPage() {
       
       const userRes = await api.get("/auth/me");
       const user = userRes.data;
+      setCurrentUser(user);
       
-      if (user.role === "driver") {
-        router.push(getRedirectUrl('/driver'));
-      } else if (user.role === "admin") {
-        router.push(getRedirectUrl('/admin'));
-      } else if (user.status === "approved") {
-        router.push(getRedirectUrl('/owner'));
+      if (user.role === "owner") {
+        if (user.status === "approved") {
+          router.push(getRedirectUrl('/owner'));
+        } else {
+          setOwnerStep('pending');
+        }
       } else {
-        setOwnerStep('pending');
+        // Mismatch: do NOT silently redirect to /driver
+        setOwnerStep('form');
+        setRoleMismatchNotice({
+          expectedRole: 'owner',
+          actualRole: user.role,
+          email: user.email,
+        });
       }
     } catch (err: unknown) {
       console.error(err);
@@ -224,15 +304,13 @@ export default function AuthPage() {
 
   const handleOwnerGoogleReg = () => loginWithGoogle();
   const handleOwnerGoogleLogin = () => loginWithGoogle();
-  
-  const canAuthenticate = true;
   const handleGoogleAuth = () => loginWithGoogle();
-  const handleGetStarted = () => { router.push('/admin'); };
 
   const handleAdminLogin = async () => {
     if (!adminLoginValid) return;
     setAdminLoginLoading(true);
     setAdminLoginError('');
+    setRoleMismatchNotice(null);
     try {
       const res = await api.post("/auth/login", {
         email: adminLogin.email,
@@ -243,13 +321,17 @@ export default function AuthPage() {
       // Verify the user is actually an admin
       const userRes = await api.get("/auth/me");
       const user = userRes.data;
+      setCurrentUser(user);
       
       if (user.role === "admin") {
-        router.push('/admin');
+        router.push(getRedirectUrl('/admin'));
       } else {
-        // Not an admin — clear token and show error
-        localStorage.removeItem("gariha_token");
-        setAdminLoginError("This account does not have administrator privileges.");
+        // Not an admin: do NOT wipe token! Show clear mismatch error
+        setRoleMismatchNotice({
+          expectedRole: 'admin',
+          actualRole: user.role,
+          email: user.email,
+        });
         setAdminLoginLoading(false);
       }
     } catch (err: unknown) {
@@ -258,6 +340,114 @@ export default function AuthPage() {
       setAdminLoginError(errorMsg);
       setAdminLoginLoading(false);
     }
+  };
+
+  const renderSessionOrMismatchBanner = (currentRoleView: 'driver' | 'owner' | 'admin') => {
+    if (roleMismatchNotice) {
+      return (
+        <div className="mb-6 p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 shadow-sm text-left">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={22} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-bold text-base text-amber-900 mb-1">
+                Rôle de compte différent
+              </h4>
+              <p className="text-sm text-amber-800 leading-relaxed mb-4">
+                Vous êtes connecté avec l&apos;adresse <strong>{roleMismatchNotice.email}</strong> associée au rôle <strong>{getRoleLabel(roleMismatchNotice.actualRole)}</strong>.
+                L&apos;espace auquel vous tentez d&apos;accéder requiert le rôle <strong>{getRoleLabel(roleMismatchNotice.expectedRole)}</strong>.
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleGoToRoleDashboard(roleMismatchNotice.actualRole)}
+                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-[#0F1E7A] text-white hover:bg-[#1A2FA8] transition-all shadow-sm"
+                >
+                  Accéder à mon espace ({getRoleLabel(roleMismatchNotice.actualRole)})
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSwitchAccount}
+                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition-all"
+                >
+                  Changer de compte / Se déconnecter
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (currentUser) {
+      if (currentUser.role === currentRoleView) {
+        return (
+          <div className="mb-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-sm text-left">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 size={22} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-bold text-base text-emerald-900 mb-1">
+                  Session active : {currentUser.full_name}
+                </h4>
+                <p className="text-sm text-emerald-800 leading-relaxed mb-4">
+                  Vous êtes déjà connecté à votre compte {getRoleLabel(currentRoleView)} ({currentUser.email}).
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleGoToRoleDashboard(currentUser.role)}
+                    className="px-4 py-2.5 rounded-xl font-bold text-xs bg-[#10B981] text-white hover:bg-[#059669] transition-all shadow-sm"
+                  >
+                    Accéder à mon tableau de bord
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSwitchAccount}
+                    className="px-4 py-2.5 rounded-xl font-bold text-xs bg-white border border-emerald-300 text-emerald-900 hover:bg-emerald-100 transition-all"
+                  >
+                    Changer de compte
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div className="mb-6 p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 shadow-sm text-left">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={22} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-bold text-base text-amber-900 mb-1">
+                  Compte connecté : {getRoleLabel(currentUser.role)}
+                </h4>
+                <p className="text-sm text-amber-800 leading-relaxed mb-4">
+                  Vous êtes actuellement connecté en tant que <strong>{currentUser.full_name}</strong> ({currentUser.email}) avec le rôle <strong>{getRoleLabel(currentUser.role)}</strong>.
+                  Vous avez sélectionné l&apos;espace <strong>{getRoleLabel(currentRoleView)}</strong>.
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleGoToRoleDashboard(currentUser.role)}
+                    className="px-4 py-2.5 rounded-xl font-bold text-xs bg-[#0F1E7A] text-white hover:bg-[#1A2FA8] transition-all shadow-sm"
+                  >
+                    Accéder à mon espace ({getRoleLabel(currentUser.role)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSwitchAccount}
+                    className="px-4 py-2.5 rounded-xl font-bold text-xs bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition-all"
+                  >
+                    Changer de compte / Se déconnecter
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    return null;
   };
 
   const fadeInUp = {
@@ -299,10 +489,45 @@ export default function AuthPage() {
                 <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-[#0F1E7A] mb-4" style={{ fontFamily: 'var(--font-display)' }}>Join the GARIHA Network</h1>
                 <p className="text-lg text-slate-500">Select your account type to continue your journey with us.</p>
               </div>
+
+              {currentUser && (
+                <div className="mb-10 p-5 bg-white/85 backdrop-blur-md rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 max-w-2xl mx-auto">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-blue-50 text-[#0F1E7A] flex items-center justify-center font-bold">
+                      <User size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs text-slate-500 font-medium">Session actuellement active</p>
+                      <p className="text-sm font-bold text-[#0F1E7A]">
+                        {currentUser.full_name} <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-[#0F1E7A] ml-1">
+                          {getRoleLabel(currentUser.role)}
+                        </span>
+                      </p>
+                      <p className="text-xs text-slate-400">{currentUser.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleGoToRoleDashboard(currentUser.role)}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#0F1E7A] text-white hover:bg-[#1A2FA8] transition-all shadow-sm"
+                    >
+                      Accéder à mon espace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSwitchAccount}
+                      className="px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all"
+                    >
+                      Changer de compte
+                    </button>
+                  </div>
+                </div>
+              )}
               
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Driver Card */}
-                <button onClick={() => setRole('driver')} className="group relative bg-white/80 backdrop-blur-md rounded-[2rem] p-8 text-left border border-white shadow-[0_8px_30px_rgba(15,30,122,0.06)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.15)] transition-all duration-500 overflow-hidden text-slate-900">
+                <button onClick={() => { setRole('driver'); setDriverError(''); setRoleMismatchNotice(null); }} className="group relative bg-white/80 backdrop-blur-md rounded-[2rem] p-8 text-left border border-white shadow-[0_8px_30px_rgba(15,30,122,0.06)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.15)] transition-all duration-500 overflow-hidden text-slate-900">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#10B981]/15 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#10B981]/10 to-[#059669]/20 flex items-center justify-center mb-6 group-hover:bg-gradient-to-br group-hover:from-[#10B981] group-hover:to-[#047857] group-hover:text-white transition-all duration-500 text-[#059669]">
                     <Car size={28} />
@@ -315,7 +540,7 @@ export default function AuthPage() {
                 </button>
 
                 {/* Parking Owner Card */}
-                <button onClick={() => setRole('owner')} className="group relative bg-white/70 backdrop-blur-md rounded-[2rem] p-8 text-left border border-white shadow-[0_8px_30px_rgba(15,30,122,0.06)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.12)] transition-all duration-500 overflow-hidden text-slate-900">
+                <button onClick={() => { setRole('owner'); setOwnerStep('form'); setRoleMismatchNotice(null); }} className="group relative bg-white/70 backdrop-blur-md rounded-[2rem] p-8 text-left border border-white shadow-[0_8px_30px_rgba(15,30,122,0.06)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.12)] transition-all duration-500 overflow-hidden text-slate-900">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#4DCCE7]/10 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1A2FA8]/10 to-[#4DCCE7]/10 flex items-center justify-center mb-6 group-hover:bg-gradient-to-br group-hover:from-[#1A2FA8] group-hover:to-[#4DCCE7] group-hover:text-white transition-all duration-500 text-[#1A2FA8]">
                     <Building size={28} />
@@ -328,7 +553,7 @@ export default function AuthPage() {
                 </button>
 
                 {/* Admin Card */}
-                <button onClick={() => setRole('admin')} className="group relative bg-[#0F1E7A] rounded-[2rem] p-8 text-left border border-[#1A2FA8] shadow-[0_8px_30px_rgba(15,30,122,0.15)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.3)] transition-all duration-500 overflow-hidden text-white">
+                <button onClick={() => { setRole('admin'); setAdminLoginError(''); setRoleMismatchNotice(null); }} className="group relative bg-[#0F1E7A] rounded-[2rem] p-8 text-left border border-[#1A2FA8] shadow-[0_8px_30px_rgba(15,30,122,0.15)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.3)] transition-all duration-500 overflow-hidden text-white">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#4DCCE7]/20 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
                   <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-6 group-hover:bg-white group-hover:text-[#0F1E7A] transition-all duration-500 border border-white/20">
                     <ShieldCheck size={28} />
@@ -346,7 +571,7 @@ export default function AuthPage() {
           {/* DRIVER AUTH FLOW */}
           {role === 'driver' && (
             <motion.div key="driver-auth" variants={fadeInUp} initial="hidden" animate="visible" exit="exit" className="w-full max-w-xl mx-auto">
-              <button onClick={() => { setRole('none'); setDriverError(''); }} className="mb-6 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
+              <button onClick={() => { setRole('none'); setDriverError(''); setRoleMismatchNotice(null); }} className="mb-6 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
                 <ArrowLeft size={16} /> Retour au choix du compte
               </button>
 
@@ -364,6 +589,8 @@ export default function AuthPage() {
                     {driverTab === 'login' ? 'Accédez à vos réservations et vos places en direct' : 'Rejoignez GARIHA pour réserver et suivre vos places'}
                   </p>
                 </div>
+
+                {renderSessionOrMismatchBanner('driver')}
 
                 {/* Tabs */}
                 <div className="flex bg-slate-100 p-1.5 rounded-xl mb-6">
@@ -534,7 +761,7 @@ export default function AuthPage() {
           {/* PARKING OWNER AUTH FLOW */}
           {role === 'owner' && (
             <motion.div key="owner-auth" variants={fadeInUp} initial="hidden" animate="visible" exit="exit" className="w-full max-w-5xl mx-auto">
-              <button onClick={() => { setRole('none'); setOwnerStep('form'); setOwnerTab('register'); }} className="mb-8 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
+              <button onClick={() => { setRole('none'); setOwnerStep('form'); setOwnerTab('register'); setRoleMismatchNotice(null); }} className="mb-8 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
                 <ArrowLeft size={16} /> Back to Selection
               </button>
 
@@ -638,6 +865,7 @@ export default function AuthPage() {
 
                       {/* Right Panel - Forms */}
                       <div className="p-10 md:p-14 lg:w-[65%]">
+                        {renderSessionOrMismatchBanner('owner')}
                         {/* Tabs */}
                         <div className="flex bg-slate-100 rounded-xl p-1 mb-8">
                           <button onClick={() => setOwnerTab('register')} className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${ownerTab === 'register' ? 'bg-white text-[#0F1E7A] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`} style={{ fontFamily: 'var(--font-display)' }}>Create Account</button>
@@ -760,7 +988,7 @@ export default function AuthPage() {
           {/* STEP 2: ADMIN AUTH FLOW */}
           {role === 'admin' && (
             <motion.div key="admin-auth" variants={fadeInUp} initial="hidden" animate="visible" exit="exit" className="w-full max-w-md mx-auto">
-              <button onClick={() => setRole('none')} className="mb-8 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
+              <button onClick={() => { setRole('none'); setAdminLoginError(''); setRoleMismatchNotice(null); }} className="mb-8 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
                 <ArrowLeft size={16} /> Back to Selection
               </button>
               
@@ -773,13 +1001,15 @@ export default function AuthPage() {
               <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_80px_rgba(15,30,122,0.08)] border border-white overflow-hidden p-10 relative">
                 <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-[#0F1E7A] via-[#4DCCE7] to-[#0F1E7A]"></div>
                 
-                <div className="text-center mb-10">
+                <div className="text-center mb-8">
                   <div className="w-16 h-16 mx-auto bg-gradient-to-br from-[#0F1E7A] to-[#1A2FA8] rounded-2xl flex items-center justify-center mb-5 shadow-xl shadow-[#0F1E7A]/20">
                     <ShieldCheck size={30} className="text-white" />
                   </div>
                   <h2 className="text-3xl font-extrabold text-[#0F1E7A] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Admin Portal</h2>
                   <p className="text-slate-500 text-sm font-medium">Sign in with your administrator credentials</p>
                 </div>
+
+                {renderSessionOrMismatchBanner('admin')}
 
                 {adminLoginError && (
                   <motion.div

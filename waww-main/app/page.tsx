@@ -101,7 +101,7 @@ const LandingPage = () => {
               Find Parking
             </Link>
             <Link 
-              href="/driver" 
+              href="/auth" 
               className="relative overflow-hidden px-5 py-2 rounded-full bg-slate-900 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(15,23,42,0.2)] hover:shadow-[0_8px_25px_rgba(15,23,42,0.3)] hover:-translate-y-0.5 transition-all duration-300 group"
             >
               <span className="relative z-10 flex items-center gap-1.5">
@@ -169,7 +169,7 @@ const LandingPage = () => {
               <Link href="/track" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white border border-slate-200 text-[#1A2FA8] font-bold text-md shadow-sm transition-all">
                 Suivi de ma réservation
               </Link>
-              <Link href="/driver" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-md shadow-[0_4px_20px_rgba(15,23,42,0.2)] transition-colors">
+              <Link href="/auth" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-md shadow-[0_4px_20px_rgba(15,23,42,0.2)] transition-colors">
                 Your Account
                 <ArrowRight size={18} />
               </Link>
@@ -213,7 +213,7 @@ const LandingPage = () => {
                 <Link href="/track" className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-white/80 backdrop-blur-sm text-[#1A2FA8] border-2 border-[#1A2FA8]/20 font-bold text-lg shadow-sm hover:shadow-lg hover:border-[#1A2FA8]/50 hover:bg-white hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
                   Suivi Réservation
                 </Link>
-                <Link href="/driver" className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-900 text-white font-bold text-lg shadow-sm hover:shadow-lg hover:bg-slate-800 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+                <Link href="/auth" className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-900 text-white font-bold text-lg shadow-sm hover:shadow-lg hover:bg-slate-800 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
                   Your Account
                   <ArrowRight size={18} />
                 </Link>
