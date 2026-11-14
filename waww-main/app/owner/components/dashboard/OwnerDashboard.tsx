@@ -114,7 +114,7 @@ export default function OwnerDashboard() {
         <main className={s.content}>
           <div className={s.topbar}>
             <div className={s.brand}>
-              <img src="http://localhost:3000/_next/image?url=https%3A%2F%2Fres.cloudinary.com%2Fdw1zljrse%2Fimage%2Fupload%2Fv1776985917%2Fgariha1_1_kluzyl.png&w=1920&q=75" alt="Gariha" className={s.realLogo} />
+              <img src="https://res.cloudinary.com/dw1zljrse/image/upload/v1776985917/gariha1_1_kluzyl.png" alt="Gariha" className={s.realLogo} />
               <span className={s.brandBadgeRole}>OWNERS</span>
             </div>
             <div className={s.topbarProfile}>
