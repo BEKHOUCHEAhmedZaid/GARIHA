@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
     if (resQuery.rows.length === 0) {
       return NextResponse.json(
-        { detail: `Aucune réservation trouvée pour le numéro #${resId} avec l'immatriculation ${cleanPlate}.` },
+        { detail: "Aucune réservation trouvée correspondant à ces informations de vérification." },
         { status: 404 }
       );
     }

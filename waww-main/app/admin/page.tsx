@@ -226,6 +226,128 @@ export default function AdminDashboard() {
   const [pendingOwners, setPendingOwners] = useState<Array<{ id: number; full_name: string; email: string; role: string; avatar: string; created_at: string; phone?: string; parking_name?: string; location?: string; total_places?: number }>>([]);
   const [approvedOwners, setApprovedOwners] = useState<Array<{ id: number; full_name: string; email: string; role: string; avatar: string; created_at: string; phone?: string; parking_name?: string; location?: string; total_places?: number }>>([]);
 
+  // Real Drivers State
+  interface AdminDriver {
+    id: number;
+    full_name: string;
+    email: string;
+    phone: string | null;
+    plate_number: string | null;
+    role: string;
+    status: string;
+    avatar: string | null;
+    reservations_count: number;
+    total_spent: number;
+    created_at: string;
+  }
+  const [drivers, setDrivers] = useState<AdminDriver[]>([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const [driverSearch, setDriverSearch] = useState("");
+  const [driverStatusFilter, setDriverStatusFilter] = useState("");
+  const [driverError, setDriverError] = useState("");
+
+  // User Details Modal State
+  interface UserDetailModalData {
+    user: {
+      id: number;
+      full_name: string;
+      email: string;
+      phone: string | null;
+      plate_number: string | null;
+      role: string;
+      status: string;
+      avatar: string | null;
+      created_at: string;
+    };
+    reservations: Array<{
+      id: number;
+      status: string;
+      created_at: string;
+      expires_at: string;
+      plate_number: string;
+      spot_name: string;
+      spot_price: number;
+      parking_name: string;
+      parking_location: string;
+    }>;
+    parkings: Array<{
+      id: number;
+      parking_name: string;
+      location: string;
+      total_places: number;
+      available_places: number;
+      pricing: string;
+      created_at: string;
+      spots_count: number;
+      active_reservations_count: number;
+    }>;
+  }
+  const [selectedUserDetail, setSelectedUserDetail] = useState<UserDetailModalData | null>(null);
+  const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
+
+  const handleViewUser = async (userId: number) => {
+    setIsUserDetailsModalOpen(true);
+    setLoadingUserDetails(true);
+    try {
+      const res = await api.get(`/admin/users/${userId}`);
+      setSelectedUserDetail(res.data);
+    } catch (e) {
+      console.error(e);
+      showToast("Impossible de charger les détails de l'utilisateur", "err");
+      setIsUserDetailsModalOpen(false);
+    } finally {
+      setLoadingUserDetails(false);
+    }
+  };
+
+  const handleStartChatWithUser = (user: { id: number; full_name: string; avatar?: string | null; role: string }) => {
+    setActiveTab("support");
+    setNavActive("nav-support");
+    setIsUserDetailsModalOpen(false);
+    
+    const existing = conversations.find(c => c.user_id === user.id);
+    if (existing) {
+      setActiveChat(existing);
+    } else {
+      const newConv: Conversation = {
+        user_id: user.id,
+        full_name: user.full_name,
+        avatar: user.avatar || "https://res.cloudinary.com/dw1zljrse/image/upload/v1776985917/gariha1_1_kluzyl.png",
+        last_message: "Nouvelle discussion",
+        last_message_time: new Date().toISOString(),
+        unread_count: 0
+      };
+      setConversations(prev => [newConv, ...prev]);
+      setActiveChat(newConv);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== "drivers") return;
+    let isMounted = true;
+    const fetchDrivers = async () => {
+      setLoadingDrivers(true);
+      setDriverError("");
+      try {
+        const queryParams = new URLSearchParams();
+        queryParams.set("role", "driver");
+        if (driverSearch.trim()) queryParams.set("search", driverSearch.trim());
+        const res = await api.get(`/admin/users?${queryParams.toString()}`);
+        if (isMounted) {
+          setDrivers(res.data || []);
+        }
+      } catch (err: unknown) {
+        console.error(err);
+        if (isMounted) setDriverError("Erreur lors du chargement des conducteurs.");
+      } finally {
+        if (isMounted) setLoadingDrivers(false);
+      }
+    };
+    fetchDrivers();
+    return () => { isMounted = false; };
+  }, [activeTab, driverSearch]);
+
   useEffect(() => {
     if (activeTab !== "owners" && activeTab !== "validation") return;
     let isMounted = true;
@@ -693,7 +815,8 @@ export default function AdminDashboard() {
                     <td>{new Date(o.created_at).toLocaleDateString()}</td>
                     <td><span className="badge b-active">Approved</span></td>
                     <td>
-                      <button className="ab ab-info" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button>
+                      <button className="ab ab-info" title="Voir les détails réels" onClick={() => handleViewUser(o.id)}><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button>
+                      <button className="ab" title="Contacter" style={{ marginLeft: "4px", background: "rgba(37,99,235,0.1)", color: "#2563EB" }} onClick={() => handleStartChatWithUser({ id: o.id, full_name: o.full_name, avatar: o.avatar, role: 'owner' })}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
                       <button className="ab ab-del" onClick={() => handleDeleteOwner(o.id)} title="Delete Owner" style={{ marginLeft: "4px" }}><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                     </td>
                   </tr>
@@ -709,24 +832,152 @@ export default function AdminDashboard() {
         {/* DRIVERS TAB */}
         <div className={`page ${activeTab === "drivers" ? "active" : ""}`} id="page-drivers">
           <div className="sh">
-            <div><div className="sh-title">Drivers Management</div><div className="sh-sub">Monitor and moderate all platform drivers</div></div>
+            <div><div className="sh-title">Drivers Management</div><div className="sh-sub">Monitor, inspect and contact all registered drivers</div></div>
             <button className="btn btn-secondary" onClick={() => showToast("Exported drivers list")}>Export</button>
           </div>
           <div className="kpi-row">
-            <div className="kpi-card"><div className="kpi-icon" style={{ background: "#EFF6FF" }}><svg viewBox="0 0 24 24" stroke="#2563EB"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg></div><div><div className="kpi-lbl">Total Drivers</div><div className="kpi-val">{stats.activeDrivers + stats.bannedDrivers + stats.reportedDrivers}</div></div></div>
-            <div className="kpi-card"><div className="kpi-icon" style={{ background: "#ECFDF5" }}><svg viewBox="0 0 24 24" stroke="#10B981"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg></div><div><div className="kpi-lbl">Active</div><div className="kpi-val">{stats.activeDrivers}</div></div></div>
-            <div className="kpi-card"><div className="kpi-icon" style={{ background: "#FFFBEB" }}><svg viewBox="0 0 24 24" stroke="#F59E0B"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg></div><div><div className="kpi-lbl">Reported</div><div className="kpi-val">{stats.reportedDrivers}</div></div></div>
-            <div className="kpi-card"><div className="kpi-icon" style={{ background: "#FEF2F2" }}><svg viewBox="0 0 24 24" stroke="#EF4444"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg></div><div><div className="kpi-lbl">Banned</div><div className="kpi-val">{stats.bannedDrivers}</div></div></div>
+            <div className="kpi-card">
+              <div className="kpi-icon" style={{ background: "#EFF6FF" }}><svg viewBox="0 0 24 24" stroke="#2563EB"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg></div>
+              <div><div className="kpi-lbl">Total Drivers</div><div className="kpi-val">{drivers.length}</div></div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon" style={{ background: "#ECFDF5" }}><svg viewBox="0 0 24 24" stroke="#10B981"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg></div>
+              <div><div className="kpi-lbl">Active</div><div className="kpi-val">{drivers.filter(d => d.status === "active" || d.status === "approved").length}</div></div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon" style={{ background: "#FFFBEB" }}><svg viewBox="0 0 24 24" stroke="#F59E0B"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg></div>
+              <div><div className="kpi-lbl">Total Reservations</div><div className="kpi-val">{drivers.reduce((acc, d) => acc + (d.reservations_count || 0), 0)}</div></div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-icon" style={{ background: "#FEF2F2" }}><svg viewBox="0 0 24 24" stroke="#EF4444"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg></div>
+              <div><div className="kpi-lbl">Banned / Suspended</div><div className="kpi-val">{drivers.filter(d => d.status === "banned" || d.status === "suspended").length}</div></div>
+            </div>
           </div>
           <div className="tbl-card">
             <div className="tbl-controls">
-              <div className="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg><input type="text" placeholder="Search drivers…" /></div>
-              <select className="fsel"><option value="">All Status</option><option value="active">Active</option><option value="reported">Reported</option><option value="banned">Banned</option></select>
+              <div className="search">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+                <input 
+                  type="text" 
+                  placeholder="Rechercher par nom, email, téléphone ou plaque…" 
+                  value={driverSearch}
+                  onChange={(e) => setDriverSearch(e.target.value)}
+                />
+              </div>
+              <select className="fsel" value={driverStatusFilter} onChange={(e) => setDriverStatusFilter(e.target.value)}>
+                <option value="">Tous les statuts</option>
+                <option value="active">Actif / Approuvé</option>
+                <option value="pending">En attente</option>
+                <option value="banned">Banni / Suspendu</option>
+              </select>
             </div>
+
+            {driverError && (
+              <div style={{ padding: "12px 20px", background: "#FEF2F2", color: "#DC2626", fontSize: "13px", borderBottom: "1px solid #FEE2E2" }}>
+                {driverError}
+              </div>
+            )}
+
             <table className="tbl">
-              <thead><tr><th>Driver</th><th>Plate</th><th>Reservations</th><th>Reports</th><th>Spent</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Conducteur</th>
+                  <th>Contact</th>
+                  <th>Plaque</th>
+                  <th>Réservations</th>
+                  <th>Dépenses</th>
+                  <th>Inscrit le</th>
+                  <th>Statut</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
               <tbody>
-                <tr><td colSpan={8} style={{ textAlign: "center", padding: "30px", color: "var(--text2)" }}>No drivers registered yet</td></tr>
+                {loadingDrivers ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: "center", padding: "40px", color: "var(--text2)" }}>
+                      Chargement des conducteurs…
+                    </td>
+                  </tr>
+                ) : (
+                  (() => {
+                    const filtered = drivers.filter(d => {
+                      if (!driverStatusFilter) return true;
+                      if (driverStatusFilter === "active") return d.status === "active" || d.status === "approved";
+                      if (driverStatusFilter === "banned") return d.status === "banned" || d.status === "suspended";
+                      return d.status.toLowerCase() === driverStatusFilter.toLowerCase();
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={8} style={{ textAlign: "center", padding: "40px", color: "var(--text2)" }}>
+                            {driverSearch || driverStatusFilter 
+                              ? "Aucun conducteur ne correspond à vos critères de recherche." 
+                              : "Aucun conducteur enregistré pour le moment."}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map(d => (
+                      <tr key={d.id}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <img 
+                              src={d.avatar || "https://res.cloudinary.com/dw1zljrse/image/upload/v1776985917/gariha1_1_kluzyl.png"} 
+                              alt={d.full_name} 
+                              style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} 
+                            />
+                            <div>
+                              <strong>{d.full_name}</strong>
+                              <div style={{ fontSize: "11px", color: "var(--text3)" }}>ID #{d.id}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: "13px" }}>{d.email}</div>
+                          <div style={{ fontSize: "12px", color: "var(--text3)" }}>{d.phone || "—"}</div>
+                        </td>
+                        <td>
+                          {d.plate_number ? (
+                            <span style={{ fontFamily: "monospace", fontWeight: 700, padding: "2px 8px", background: "#F1F5F9", borderRadius: "6px", fontSize: "12px" }}>
+                              {d.plate_number}
+                            </span>
+                          ) : (
+                            <span style={{ color: "var(--text3)", fontStyle: "italic" }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          <strong>{d.reservations_count || 0}</strong>
+                        </td>
+                        <td>
+                          <strong style={{ color: "#0F1E7A" }}>{d.total_spent || 0} DZD</strong>
+                        </td>
+                        <td>{new Date(d.created_at).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`badge ${d.status === "active" || d.status === "approved" ? "b-active" : d.status === "banned" || d.status === "suspended" ? "b-suspended" : "b-pending"}`}>
+                            {d.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <button className="ab ab-info" title="Voir les informations réelles" onClick={() => handleViewUser(d.id)}>
+                              <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                            </button>
+                            <button 
+                              className="ab" 
+                              title="Contacter ce conducteur" 
+                              style={{ background: "rgba(37,99,235,0.1)", color: "#2563EB" }} 
+                              onClick={() => handleStartChatWithUser({ id: d.id, full_name: d.full_name, avatar: d.avatar, role: 'driver' })}
+                            >
+                              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()
+                )}
               </tbody>
             </table>
           </div>
@@ -1060,7 +1311,7 @@ export default function AdminDashboard() {
                       }}
                     >
                       <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>
-                        {c.avatar ? <img src={c.avatar} style={{ width: "100%", height: "100%", borderRadius: "10px" }} /> : c.full_name[0]}
+                        {c.avatar ? <img src={c.avatar} alt={c.full_name} style={{ width: "100%", height: "100%", borderRadius: "10px" }} /> : c.full_name[0]}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
@@ -1186,6 +1437,159 @@ export default function AdminDashboard() {
               <button className="btn btn-primary" onClick={() => { showToast("Owner added successfully"); setIsAddOwnerModalOpen(false); }}><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>Add Owner</button>
               <button className="btn btn-secondary" onClick={() => setIsAddOwnerModalOpen(false)}>Cancel</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* USER DETAILS MODAL */}
+      {isUserDetailsModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsUserDetailsModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "680px", width: "90%", maxHeight: "85vh", overflowY: "auto" }}>
+            <div className="modal-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>Détails de l&apos;utilisateur</span>
+              <button className="modal-close" onClick={() => setIsUserDetailsModalOpen(false)}>✕</button>
+            </div>
+
+            {loadingUserDetails ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "var(--text2)" }}>
+                Chargement des informations en base…
+              </div>
+            ) : selectedUserDetail ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                {/* User Header */}
+                <div style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px", background: "var(--surface-2)", borderRadius: "12px" }}>
+                  <img 
+                    src={selectedUserDetail.user.avatar || "https://res.cloudinary.com/dw1zljrse/image/upload/v1776985917/gariha1_1_kluzyl.png"} 
+                    alt={selectedUserDetail.user.full_name} 
+                    style={{ width: "54px", height: "54px", borderRadius: "50%", objectFit: "cover" }} 
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                      <h4 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "var(--primary)" }}>{selectedUserDetail.user.full_name}</h4>
+                      <span className="badge b-active">{selectedUserDetail.user.role}</span>
+                      <span className="badge b-pending">{selectedUserDetail.user.status}</span>
+                    </div>
+                    <div style={{ fontSize: "13px", color: "var(--text2)", marginTop: "4px" }}>
+                      ID #{selectedUserDetail.user.id} • Inscrit le {new Date(selectedUserDetail.user.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact and Info Grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "#F8FAFC", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)" }}>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text3)", textTransform: "uppercase" }}>Email</div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text1)", wordBreak: "break-all" }}>{selectedUserDetail.user.email}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text3)", textTransform: "uppercase" }}>Téléphone</div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text1)" }}>{selectedUserDetail.user.phone || <span style={{ color: "var(--text3)", fontStyle: "italic" }}>Non renseigné</span>}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text3)", textTransform: "uppercase" }}>Immatriculation</div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text1)" }}>
+                      {selectedUserDetail.user.plate_number ? (
+                        <span style={{ fontFamily: "monospace", padding: "2px 6px", background: "#E2E8F0", borderRadius: "4px" }}>{selectedUserDetail.user.plate_number}</span>
+                      ) : (
+                        <span style={{ color: "var(--text3)", fontStyle: "italic" }}>Non renseignée</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text3)", textTransform: "uppercase" }}>Dernière mise à jour</div>
+                    <div style={{ fontSize: "13px", color: "var(--text2)" }}>{new Date(selectedUserDetail.user.created_at).toLocaleDateString()}</div>
+                  </div>
+                </div>
+
+                {/* Specific Section: Driver Reservations OR Owner Parkings */}
+                {selectedUserDetail.user.role === "driver" && (
+                  <div>
+                    <h5 style={{ margin: "0 0 10px 0", fontSize: "14px", fontWeight: 700, color: "var(--primary)" }}>
+                      Historique des réservations ({selectedUserDetail.reservations.length})
+                    </h5>
+                    {selectedUserDetail.reservations.length === 0 ? (
+                      <div style={{ padding: "20px", textAlign: "center", background: "#F8FAFC", borderRadius: "8px", color: "var(--text3)", fontSize: "13px" }}>
+                        Aucune réservation enregistrée pour ce conducteur.
+                      </div>
+                    ) : (
+                      <div style={{ maxHeight: "200px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "8px" }}>
+                        <table className="tbl" style={{ margin: 0, fontSize: "12px" }}>
+                          <thead>
+                            <tr>
+                              <th>ID</th>
+                              <th>Parking</th>
+                              <th>Place</th>
+                              <th>Statut</th>
+                              <th>Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedUserDetail.reservations.map(r => (
+                              <tr key={r.id}>
+                                <td>#{r.id}</td>
+                                <td>
+                                  <strong>{r.parking_name}</strong>
+                                  <div style={{ fontSize: "10px", color: "var(--text3)" }}>{r.parking_location}</div>
+                                </td>
+                                <td><strong style={{ color: "#10B981" }}>{r.spot_name}</strong></td>
+                                <td><span className="badge b-active">{r.status}</span></td>
+                                <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedUserDetail.user.role === "owner" && (
+                  <div>
+                    <h5 style={{ margin: "0 0 10px 0", fontSize: "14px", fontWeight: 700, color: "var(--primary)" }}>
+                      Parkings gérés ({selectedUserDetail.parkings.length})
+                    </h5>
+                    {selectedUserDetail.parkings.length === 0 ? (
+                      <div style={{ padding: "20px", textAlign: "center", background: "#F8FAFC", borderRadius: "8px", color: "var(--text3)", fontSize: "13px" }}>
+                        Aucun parking associé à ce propriétaire dans la base.
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        {selectedUserDetail.parkings.map(p => (
+                          <div key={p.id} style={{ padding: "12px 16px", background: "#F8FAFC", border: "1px solid var(--border)", borderRadius: "8px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+                              <strong style={{ fontSize: "14px", color: "#0F1E7A" }}>{p.parking_name}</strong>
+                              <span style={{ fontSize: "12px", color: "#10B981", fontWeight: 700 }}>{p.available_places} / {p.total_places} places disponibles</span>
+                            </div>
+                            <div style={{ fontSize: "12px", color: "var(--text2)" }}>📍 {p.location}</div>
+                            <div style={{ fontSize: "11px", color: "var(--text3)", marginTop: "4px" }}>
+                              {p.spots_count} emplacements configurés • {p.active_reservations_count} réservations en cours
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer Buttons */}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px", paddingTop: "14px", borderTop: "1px solid var(--border)" }}>
+                  <button className="btn btn-secondary" onClick={() => setIsUserDetailsModalOpen(false)}>
+                    Fermer
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => handleStartChatWithUser({ 
+                      id: selectedUserDetail.user.id, 
+                      full_name: selectedUserDetail.user.full_name, 
+                      avatar: selectedUserDetail.user.avatar, 
+                      role: selectedUserDetail.user.role 
+                    })}
+                  >
+                    Ouvrir la discussion
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

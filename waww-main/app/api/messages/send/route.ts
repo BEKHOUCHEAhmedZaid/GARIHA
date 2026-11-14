@@ -9,19 +9,19 @@ export async function POST(req: Request) {
     const { receiver_id, content } = body;
 
     if (!content || !content.trim()) {
-      return NextResponse.json({ detail: "Content is required" }, { status: 400 });
+      return NextResponse.json({ detail: "Le contenu du message est requis" }, { status: 400 });
     }
 
     let targetReceiverId = receiver_id ? parseInt(receiver_id, 10) : null;
 
     if (!targetReceiverId) {
-      // Default to admin for support
+      // Default to platform admin / support
       const adminRes = await query(
-        "SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1"
+        "SELECT id FROM users WHERE LOWER(role) = 'admin' ORDER BY id ASC LIMIT 1"
       );
       if (adminRes.rows.length === 0) {
         return NextResponse.json(
-          { detail: "No admin available to receive message" },
+          { detail: "Aucun administrateur disponible pour recevoir le message" },
           { status: 404 }
         );
       }
@@ -29,12 +29,20 @@ export async function POST(req: Request) {
     }
 
     if (user.id === targetReceiverId) {
-      return NextResponse.json({ detail: "Cannot send a message to yourself" }, { status: 400 });
+      return NextResponse.json({ detail: "Impossible d'envoyer un message à vous-même" }, { status: 400 });
     }
 
+    // Check that receiver exists
+    const receiverRes = await query("SELECT id, role, full_name FROM users WHERE id = $1", [targetReceiverId]);
+    if (receiverRes.rows.length === 0) {
+      return NextResponse.json({ detail: "Destinataire introuvable" }, { status: 404 });
+    }
+
+    const userRole = (user.role || "").toLowerCase();
+
     // Verify recipient authorization
-    if (user.role === "driver") {
-      const adminCheck = await query("SELECT id FROM users WHERE id = $1 AND role = 'admin'", [targetReceiverId]);
+    if (userRole === "driver") {
+      const adminCheck = await query("SELECT id FROM users WHERE id = $1 AND LOWER(role) = 'admin'", [targetReceiverId]);
       if (adminCheck.rows.length === 0) {
         const ownerCheck = await query(
           `SELECT p.owner_id 
@@ -46,13 +54,13 @@ export async function POST(req: Request) {
         );
         if (ownerCheck.rows.length === 0) {
           return NextResponse.json(
-            { detail: "Forbidden: You can only message the administrator or owners of parkings you reserved" },
+            { detail: "Accès refusé : Vous pouvez uniquement contacter l'administrateur ou les propriétaires des parkings réservés" },
             { status: 403 }
           );
         }
       }
-    } else if (user.role === "owner") {
-      const adminCheck = await query("SELECT id FROM users WHERE id = $1 AND role = 'admin'", [targetReceiverId]);
+    } else if (userRole === "owner") {
+      const adminCheck = await query("SELECT id FROM users WHERE id = $1 AND LOWER(role) = 'admin'", [targetReceiverId]);
       if (adminCheck.rows.length === 0) {
         const driverCheck = await query(
           `SELECT r.driver_id
@@ -64,7 +72,7 @@ export async function POST(req: Request) {
         );
         if (driverCheck.rows.length === 0) {
           return NextResponse.json(
-            { detail: "Forbidden: You can only message the administrator or drivers who booked your parkings" },
+            { detail: "Accès refusé : Vous pouvez uniquement contacter l'administrateur ou les conducteurs ayant réservé dans vos parkings" },
             { status: 403 }
           );
         }

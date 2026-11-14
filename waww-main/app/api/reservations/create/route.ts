@@ -11,11 +11,29 @@ export async function POST(req: Request) {
     await expireStaleReservations();
     const user = await getCurrentUser(req);
     const body = await req.json();
-    const { parking_spot_id, driver_name, plate_number, duration_minutes = 60 } = body;
+    const { parking_spot_id, duration_minutes = 60 } = body;
 
-    if (!parking_spot_id || !driver_name || !plate_number) {
+    // Prefill from authenticated driver if not provided
+    const driver_name = (body.driver_name || user?.full_name || "").trim();
+    const plate_number = (body.plate_number || user?.plate_number || "").trim().toUpperCase();
+
+    if (!parking_spot_id) {
       return NextResponse.json(
-        { detail: "Parking spot, driver name and plate number are required" },
+        { detail: "L'emplacement de parking est requis pour effectuer la réservation." },
+        { status: 400 }
+      );
+    }
+
+    if (!driver_name) {
+      return NextResponse.json(
+        { detail: "Le nom du conducteur est obligatoire." },
+        { status: 400 }
+      );
+    }
+
+    if (!plate_number) {
+      return NextResponse.json(
+        { detail: "Le numéro d'immatriculation du véhicule est obligatoire pour réserver une place." },
         { status: 400 }
       );
     }
@@ -38,7 +56,7 @@ export async function POST(req: Request) {
 
     if (spotRes.rows.length === 0) {
       await client.query("ROLLBACK");
-      return NextResponse.json({ detail: "Parking spot not found" }, { status: 404 });
+      return NextResponse.json({ detail: "Emplacement de parking introuvable" }, { status: 404 });
     }
 
     const spot = spotRes.rows[0];
@@ -50,6 +68,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Strictly lock driver_id to the authenticated user ID
     const driverId = user?.id || null;
 
     const insertRes = await client.query(
@@ -58,7 +77,7 @@ export async function POST(req: Request) {
       )
       VALUES ($1, $2, $3, $4, 'active', $5)
       RETURNING *`,
-      [spot.id, driverId, driver_name.trim(), plate_number.trim().toUpperCase(), expiresAt]
+      [spot.id, driverId, driver_name, plate_number, expiresAt]
     );
 
     await client.query(
@@ -66,13 +85,21 @@ export async function POST(req: Request) {
       [spot.id]
     );
 
+    // If driver didn't have plate_number saved on profile, save it now
+    if (user && !user.plate_number && plate_number) {
+      await client.query(
+        "UPDATE users SET plate_number = $1 WHERE id = $2",
+        [plate_number, user.id]
+      );
+    }
+
     await client.query("COMMIT");
 
     if (driverId) {
       await createReservationNotification(
         driverId,
         "Reservation Confirmed",
-        `Your reservation for spot ${spot.name} at ${spot.parking_name} is confirmed.`
+        `Votre réservation pour la place ${spot.name} au ${spot.parking_name} est confirmée.`
       );
     }
 

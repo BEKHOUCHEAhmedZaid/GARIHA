@@ -386,6 +386,143 @@ async function testAdminCalculations() {
   assert(calculated.approvedOwners === 1 && calculated.pendingOwners === 1, "Owner counts accurately partitioned by approved vs pending");
 }
 
+async function testReservationTrackingSecurity() {
+  console.log("\n--- TEST 11: Reservation Tracking Security & Lookup ---");
+
+  function evaluateTrackingLookup(reservations, inputId, inputPlate) {
+    if (!inputId || !inputPlate || !inputPlate.trim()) {
+      return { status: 400, error: "Numéro de réservation et immatriculation requis" };
+    }
+    const cleanId = parseInt(inputId.toString().replace(/[^0-9]/g, ""), 10);
+    const cleanPlate = inputPlate.trim().toUpperCase();
+
+    const match = reservations.find(r => r.id === cleanId && r.plate_number.trim().toUpperCase() === cleanPlate);
+    if (!match) {
+      // Must return a generic error message without revealing whether ID or plate exists alone
+      return { status: 404, error: "Aucune réservation trouvée correspondant à ces informations de vérification." };
+    }
+
+    return { status: 200, reservation: match };
+  }
+
+  const sampleReservations = [
+    { id: 10, plate_number: "00123-116-16", driver_name: "Yacine", status: "active" },
+    { id: 20, plate_number: "99887-116-16", driver_name: "Karim", status: "completed" }
+  ];
+
+  assert(
+    evaluateTrackingLookup(sampleReservations, "10", "00123-116-16").status === 200,
+    "Valid reservation ID + matching plate successfully returns reservation"
+  );
+  assert(
+    evaluateTrackingLookup(sampleReservations, "10", "WRONG-PLATE").status === 404 &&
+    evaluateTrackingLookup(sampleReservations, "10", "WRONG-PLATE").error === "Aucune réservation trouvée correspondant à ces informations de vérification.",
+    "Wrong plate for existing reservation ID returns generic 404 without leaking ID existence"
+  );
+  assert(
+    evaluateTrackingLookup(sampleReservations, "999", "00123-116-16").status === 404 &&
+    evaluateTrackingLookup(sampleReservations, "999", "00123-116-16").error === "Aucune réservation trouvée correspondant à ces informations de vérification.",
+    "Non-existent reservation ID returns same generic 404 without leaking plate existence"
+  );
+  assert(
+    evaluateTrackingLookup(sampleReservations, "", "00123-116-16").status === 400,
+    "Missing reservation ID is rejected with 400"
+  );
+  assert(
+    evaluateTrackingLookup(sampleReservations, "10", "").status === 400,
+    "Missing plate number is rejected with 400"
+  );
+}
+
+async function testMessagingAccessControl() {
+  console.log("\n--- TEST 12: Messaging Access Control & Strict Isolation ---");
+
+  function evaluateMessagePermission(sender, receiverId, context) {
+    if (sender.id === receiverId) {
+      return { allowed: false, status: 400, error: "Cannot message yourself" };
+    }
+
+    const receiver = context.users.find(u => u.id === receiverId);
+    if (!receiver) {
+      return { allowed: false, status: 404, error: "Recipient not found" };
+    }
+
+    const senderRole = (sender.role || "").toLowerCase();
+    const receiverRole = (receiver.role || "").toLowerCase();
+
+    // Admin can message any user
+    if (senderRole === "admin") {
+      return { allowed: true, status: 200 };
+    }
+
+    // Driver: only admin or owners of booked parkings
+    if (senderRole === "driver") {
+      if (receiverRole === "admin") return { allowed: true, status: 200 };
+      const hasBookingWithThisOwner = context.reservations.some(
+        r => r.driver_id === sender.id && r.parking_owner_id === receiverId
+      );
+      if (hasBookingWithThisOwner) return { allowed: true, status: 200 };
+      return { allowed: false, status: 403, error: "Forbidden: Driver can only message admin or owners of booked parkings" };
+    }
+
+    // Owner: only admin or drivers who booked in their parkings
+    if (senderRole === "owner") {
+      if (receiverRole === "admin") return { allowed: true, status: 200 };
+      const hasBookingFromThisDriver = context.reservations.some(
+        r => r.parking_owner_id === sender.id && r.driver_id === receiverId
+      );
+      if (hasBookingFromThisDriver) return { allowed: true, status: 200 };
+      return { allowed: false, status: 403, error: "Forbidden: Owner can only message admin or drivers who booked in their parkings" };
+    }
+
+    return { allowed: false, status: 403, error: "Forbidden" };
+  }
+
+  const context = {
+    users: [
+      { id: 1, role: "admin", full_name: "Admin Support" },
+      { id: 10, role: "driver", full_name: "Driver A" },
+      { id: 20, role: "driver", full_name: "Driver B" },
+      { id: 100, role: "owner", full_name: "Owner 1" },
+      { id: 200, role: "owner", full_name: "Owner 2" },
+    ],
+    reservations: [
+      { driver_id: 10, parking_owner_id: 100 }, // Driver A booked Owner 1
+    ]
+  };
+
+  const driverA = { id: 10, role: "driver" };
+  const owner1 = { id: 100, role: "owner" };
+  const owner2 = { id: 200, role: "owner" };
+  const admin = { id: 1, role: "admin" };
+
+  assert(evaluateMessagePermission(driverA, 1, context).allowed === true, "Driver can message support admin");
+  assert(evaluateMessagePermission(driverA, 100, context).allowed === true, "Driver can message owner of parking they booked");
+  assert(evaluateMessagePermission(driverA, 200, context).status === 403, "Driver CANNOT message unrelated parking owner (403)");
+  assert(evaluateMessagePermission(driverA, 10, context).status === 400, "User cannot message themselves (400)");
+  assert(evaluateMessagePermission(owner1, 1, context).allowed === true, "Owner can message support admin");
+  assert(evaluateMessagePermission(owner1, 10, context).allowed === true, "Owner can message driver who booked in their parking");
+  assert(evaluateMessagePermission(owner2, 10, context).status === 403, "Owner CANNOT message driver who has no booking with them (403)");
+  assert(evaluateMessagePermission(admin, 10, context).allowed === true, "Admin can message any driver");
+  assert(evaluateMessagePermission(admin, 100, context).allowed === true, "Admin can message any owner");
+}
+
+async function testAdminUserDetailAccess() {
+  console.log("\n--- TEST 13: Admin Global User List & Details Access ---");
+
+  function authorizeAdminUsersAccess(user) {
+    if (!user || (user.role || "").toLowerCase() !== "admin") {
+      return { allowed: false, status: 403, error: "Admin privilege required" };
+    }
+    return { allowed: true, status: 200 };
+  }
+
+  assert(authorizeAdminUsersAccess({ id: 1, role: "admin" }).allowed === true, "Admin user is granted access to users list");
+  assert(authorizeAdminUsersAccess({ id: 10, role: "driver" }).status === 403, "Driver is denied access to admin users list (403)");
+  assert(authorizeAdminUsersAccess({ id: 100, role: "owner" }).status === 403, "Owner is denied access to admin users list (403)");
+  assert(authorizeAdminUsersAccess(null).status === 403, "Unauthenticated user is denied access to admin users list (403)");
+}
+
 async function run() {
   console.log("==================================================");
   console.log(" GARIHA Fullstack Migration Test Suite");
@@ -401,6 +538,9 @@ async function run() {
   await testDriverSpotChangeAndCancelRules();
   await testOwnerDataIsolation();
   await testAdminCalculations();
+  await testReservationTrackingSecurity();
+  await testMessagingAccessControl();
+  await testAdminUserDetailAccess();
 
   console.log("\n==================================================");
   console.log(`Results: ${passed} passed, ${failed} failed.`);

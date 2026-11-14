@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   try {
     const user = await requireUser(req);
     if (user.role !== "driver") {
-      return NextResponse.json({ detail: "Forbidden: Drivers only" }, { status: 403 });
+      return NextResponse.json({ detail: "Accès réservé aux conducteurs" }, { status: 403 });
     }
 
     const contacts: Array<{
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
     // 1. Admin / Support GARIHA
     const adminRes = await query(
-      "SELECT id, full_name, email, avatar, role FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1"
+      "SELECT id, full_name, email, avatar, role FROM users WHERE LOWER(role) = 'admin' ORDER BY id ASC LIMIT 1"
     );
     if (adminRes.rows.length > 0) {
       const a = adminRes.rows[0];
@@ -34,21 +34,22 @@ export async function GET(req: Request) {
       });
     }
 
-    // 2. Parking Owners for this driver's reservations
+    // 2. Parking Owners for this driver's reservations (deduplicated by owner u.id)
     const ownersRes = await query(
-      `SELECT DISTINCT 
+      `SELECT 
          u.id as user_id, 
          u.full_name, 
          u.email, 
          u.avatar, 
          u.role, 
-         p.parking_name
+         string_agg(DISTINCT p.parking_name, ', ') as parking_names
        FROM reservations r
        JOIN parking_spots s ON r.parking_spot_id = s.id
        JOIN parkings p ON s.parking_id = p.id
        JOIN users u ON p.owner_id = u.id
        WHERE r.driver_id = $1
-       ORDER BY p.parking_name ASC`,
+       GROUP BY u.id, u.full_name, u.email, u.avatar, u.role
+       ORDER BY u.full_name ASC`,
       [user.id]
     );
 
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
         email: o.email,
         avatar: o.avatar || "https://res.cloudinary.com/dw1zljrse/image/upload/v1776985917/gariha1_1_kluzyl.png",
         role: "owner",
-        subtitle: `Propriétaire — ${o.parking_name}`,
+        subtitle: `Propriétaire — ${o.parking_names}`,
       });
     }
 
