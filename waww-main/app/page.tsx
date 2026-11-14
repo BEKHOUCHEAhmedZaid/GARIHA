@@ -87,13 +87,25 @@ const LandingPage = () => {
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
+            <Link 
+              href="/book" 
+              className="px-3.5 py-2 text-sm font-bold text-[#1A2FA8] hover:text-[#0F1E7A] transition-colors"
+            >
+              Réserver
+            </Link>
+            <Link 
+              href="/driver" 
+              className="px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Mes réservations
+            </Link>
             <Link 
               href="/auth" 
-              className="relative overflow-hidden px-6 py-2.5 rounded-full bg-slate-900 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(15,23,42,0.2)] hover:shadow-[0_8px_25px_rgba(15,23,42,0.3)] hover:-translate-y-0.5 transition-all duration-300 group"
+              className="relative overflow-hidden px-5 py-2 rounded-full bg-slate-900 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(15,23,42,0.2)] hover:shadow-[0_8px_25px_rgba(15,23,42,0.3)] hover:-translate-y-0.5 transition-all duration-300 group"
             >
-              <span className="relative z-10 flex items-center gap-2">
-                Get Started
+              <span className="relative z-10 flex items-center gap-1.5">
+                Connexion
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     const search = searchParams.get("search") || "";
 
     const conditions: string[] = [];
-    const values: any[] = [];
+    const values: string[] = [];
 
     if (roleFilter) {
       values.push(roleFilter.toLowerCase());

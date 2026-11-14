@@ -42,9 +42,25 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   // Messaging State
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [activeChat, setActiveChat] = useState<any>(null);
-  const [activeMessages, setActiveMessages] = useState<any[]>([]);
+  interface Conversation {
+    user_id: number;
+    full_name: string;
+    avatar: string;
+    last_message: string;
+    last_message_time: string;
+    unread_count: number;
+  }
+  interface Message {
+    id: number;
+    content: string;
+    sender_id: number;
+    receiver_id: number;
+    created_at: string;
+    is_read: number;
+  }
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeChat, setActiveChat] = useState<Conversation | null>(null);
+  const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [adminReply, setAdminReply] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
 
@@ -79,22 +95,46 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (activeTab === "support") {
-      fetchConversations();
-      const interval = setInterval(fetchConversations, 10000); // Polling conversations
-      return () => clearInterval(interval);
-    }
+    if (activeTab !== "support") return;
+    let isMounted = true;
+    const fetchConvs = async () => {
+      try {
+        const res = await api.get("/messages/conversations");
+        if (isMounted) setConversations(res.data);
+      } catch (e) { console.error(e); }
+    };
+    fetchConvs();
+    const interval = setInterval(fetchConvs, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeChat) {
-      fetchActiveThread(activeChat.user_id);
-      const interval = setInterval(() => fetchActiveThread(activeChat.user_id), 5000); // Polling active thread
-      return () => clearInterval(interval);
-    }
+    if (!activeChat) return;
+    let isMounted = true;
+    const fetchThread = async () => {
+      setLoadingMessages(true);
+      try {
+        const res = await api.get(`/messages/with/${activeChat.user_id}`);
+        if (isMounted) {
+          setActiveMessages(res.data);
+          // Refresh conversation list to clear unread badges
+          const convRes = await api.get("/messages/conversations");
+          if (isMounted) setConversations(convRes.data);
+        }
+      } catch (e) { console.error(e); }
+      finally { if (isMounted) setLoadingMessages(false); }
+    };
+    fetchThread();
+    const interval = setInterval(fetchThread, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [activeChat]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const showToast = (msg: string, type: string = "ok") => {
     const id = Math.random();
     setToasts((prev) => [...prev, { id, msg, type }]);
@@ -183,36 +223,57 @@ export default function AdminDashboard() {
   };
 
   // Real Owners State
-  const [pendingOwners, setPendingOwners] = useState<Array<{ id: number; full_name: string; email: string; role: string; avatar: string; created_at: string; }>>([]);
-  const [approvedOwners, setApprovedOwners] = useState<Array<{ id: number; full_name: string; email: string; role: string; avatar: string; created_at: string; }>>([]);
+  const [pendingOwners, setPendingOwners] = useState<Array<{ id: number; full_name: string; email: string; role: string; avatar: string; created_at: string; phone?: string; parking_name?: string; location?: string; total_places?: number }>>([]);
+  const [approvedOwners, setApprovedOwners] = useState<Array<{ id: number; full_name: string; email: string; role: string; avatar: string; created_at: string; phone?: string; parking_name?: string; location?: string; total_places?: number }>>([]);
 
   useEffect(() => {
-    const fetchOwners = async () => {
+    if (activeTab !== "owners" && activeTab !== "validation") return;
+    let isMounted = true;
+    const loadOwners = async () => {
       try {
         const pendingRes = await api.get("/admin/pending-owners");
-        setPendingOwners(pendingRes.data);
         const approvedRes = await api.get("/admin/approved-owners");
-        setApprovedOwners(approvedRes.data);
+        if (isMounted) {
+          setPendingOwners(pendingRes.data);
+          setApprovedOwners(approvedRes.data);
+        }
       } catch (e) { console.error(e); }
     };
-    if (activeTab === "owners") fetchOwners();
+    loadOwners();
+    return () => { isMounted = false; };
   }, [activeTab]);
 
   const handleApprove = async (id: number) => {
     try {
       await api.put(`/admin/approve-owner/${id}`);
-      showToast("Owner approved");
+      showToast("Owner approved successfully", "ok");
+      const approvedOwner = pendingOwners.find(o => o.id === id);
       setPendingOwners(p => p.filter(o => o.id !== id));
-    } catch (e) { console.error(e); showToast("Failed to approve", "err"); }
-  }
+      if (approvedOwner) {
+        setApprovedOwners(prev => [{ ...approvedOwner, role: "owner" }, ...prev]);
+      }
+      setStats(prev => ({
+        ...prev,
+        pendingOwners: Math.max(0, prev.pendingOwners - 1),
+        pendingValidations: Math.max(0, prev.pendingValidations - 1),
+        activeOwners: prev.activeOwners + 1,
+      }));
+    } catch (e) { console.error(e); showToast("Failed to approve owner", "err"); }
+  };
 
   const handleReject = async (id: number) => {
     try {
       await api.put(`/admin/reject-owner/${id}`);
       showToast("Owner rejected", "err");
       setPendingOwners(p => p.filter(o => o.id !== id));
-    } catch (e) { console.error(e); }
-  }
+      setStats(prev => ({
+        ...prev,
+        pendingOwners: Math.max(0, prev.pendingOwners - 1),
+        pendingValidations: Math.max(0, prev.pendingValidations - 1),
+        suspendedOwners: prev.suspendedOwners + 1,
+      }));
+    } catch (e) { console.error(e); showToast("Failed to reject owner", "err"); }
+  };
 
   const [ownerFilter, setOwnerFilter] = useState("");
   
@@ -220,14 +281,54 @@ export default function AdminDashboard() {
     if (!window.confirm("Are you sure you want to completely delete this owner and all their parkings? This action cannot be undone.")) return;
     try {
       await api.delete(`/admin/delete-owner/${id}`);
-      showToast("Owner deleted successfully");
+      showToast("Owner deleted successfully", "ok");
       setApprovedOwners(p => p.filter(o => o.id !== id));
       setPendingOwners(p => p.filter(o => o.id !== id));
     } catch (e) { console.error(e); showToast("Failed to delete owner", "err"); }
-  }
+  };
 
-  // Reset Data (Everything is 0 or empty)
-  const [stats, setStats] = useState({
+  // Real Stats from PostgreSQL
+  const [stats, setStats] = useState<{
+    parkings: number;
+    drivers: number;
+    revenue: number;
+    transactions: number;
+    newUsers: number;
+    activeOwners: number;
+    pendingOwners: number;
+    suspendedOwners: number;
+    activeDrivers: number;
+    reportedDrivers: number;
+    bannedDrivers: number;
+    openReports: number;
+    warningsIssued: number;
+    bansThisMonth: number;
+    resolvedReports: number;
+    totalProcessed: number;
+    commissionsEarned: number;
+    pendingPayments: number;
+    disputes: number;
+    pendingValidations: number;
+    revenue_evolution?: { week: number[]; month: number[]; year: number[] };
+    user_distribution?: number[];
+    recent_transactions?: Array<{
+      id: number;
+      parking_name: string;
+      driver_name: string;
+      plate_number: string;
+      amount: number;
+      commission: number;
+      status: string;
+      created_at: string;
+    }>;
+    platform_activity?: Array<{
+      id: number;
+      kind: string;
+      action_title: string;
+      details: string;
+      created_at: string;
+    }>;
+  }>({
     parkings: 0,
     drivers: 0,
     revenue: 0,
@@ -248,39 +349,73 @@ export default function AdminDashboard() {
     pendingPayments: 0,
     disputes: 0,
     pendingValidations: 0,
+    revenue_evolution: {
+      week: [0, 0, 0, 0, 0, 0, 0],
+      month: [0, 0, 0, 0],
+      year: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    user_distribution: [0, 0, 0, 0],
+    recent_transactions: [],
+    platform_activity: []
   });
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await api.get("/admin/stats");
-        const data = res.data;
-        setStats({
-          parkings: data.total_parkings || 0,
-          drivers: data.active_drivers || 0,
-          revenue: data.revenue || 0,
-          transactions: data.transactions || 0,
-          newUsers: data.new_users || 0,
-          activeOwners: data.approved_owners || 0,
-          pendingOwners: data.pending_owners || 0,
-          suspendedOwners: data.suspended_owners || 0,
-          activeDrivers: data.active_drivers || 0,
-          reportedDrivers: data.reported_drivers || 0,
-          bannedDrivers: data.banned_drivers || 0,
-          openReports: data.open_reports || 0,
-          warningsIssued: data.warnings_issued || 0,
-          bansThisMonth: data.bans_this_month || 0,
-          resolvedReports: data.resolved_reports || 0,
-          totalProcessed: data.total_processed || 0,
-          commissionsEarned: data.commissions_earned || 0,
-          pendingPayments: data.pending_payments || 0,
-          disputes: data.disputes || 0,
-          pendingValidations: data.pending_validations || 0,
-        });
-      } catch (e) { console.error(e); }
+  interface AnalyticsData {
+    revenue_by_month?: number[];
+    user_acquisition?: {
+      drivers: number[];
+      owners: number[];
     };
+    top_cities?: Array<{ city: string; parkings_count: number; reservations_count: number; revenue: number }>;
+    key_metrics?: {
+      cancellation_rate?: string;
+      avg_duration?: string;
+      platform_uptime?: string;
+      driver_satisfaction?: string;
+      peak_hour?: string;
+    };
+  }
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+
+  const fetchStats = async () => {
+    try {
+      const res = await api.get("/admin/stats");
+      const data = res.data;
+      setStats({
+        parkings: data.total_parkings || 0,
+        drivers: data.total_drivers || 0,
+        revenue: data.revenue || 0,
+        transactions: data.transactions || 0,
+        newUsers: data.new_users || 0,
+        activeOwners: data.approved_owners || 0,
+        pendingOwners: data.pending_owners || 0,
+        suspendedOwners: data.suspended_owners || 0,
+        activeDrivers: data.total_drivers || 0,
+        reportedDrivers: 0,
+        bannedDrivers: data.suspended_owners || 0,
+        openReports: 0,
+        warningsIssued: 0,
+        bansThisMonth: 0,
+        resolvedReports: 0,
+        totalProcessed: data.total_processed || 0,
+        commissionsEarned: data.commissions_earned || 0,
+        pendingPayments: 0,
+        disputes: 0,
+        pendingValidations: data.pending_validations || 0,
+        revenue_evolution: data.revenue_evolution,
+        user_distribution: data.user_distribution,
+        recent_transactions: data.recent_transactions || [],
+        platform_activity: data.platform_activity || []
+      });
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => {
     if (activeTab === "dashboard" || activeTab === "validation") {
-        fetchStats();
+      fetchStats();
+    } else if (activeTab === "analytics") {
+      api.get("/admin/analytics")
+        .then(res => setAnalyticsData(res.data))
+        .catch(e => console.error(e));
     }
   }, [activeTab]);
 
@@ -401,8 +536,12 @@ export default function AdminDashboard() {
                   data={{
                     labels: revChartRange === "week" ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] : revChartRange === "month" ? ['S1', 'S2', 'S3', 'S4'] : ['Jan', 'Feb', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
                     datasets: [{
-                      label: 'Revenue',
-                      data: revChartRange === "week" ? [stats.revenue*0.1, stats.revenue*0.2, stats.revenue*0.15, stats.revenue*0.3, stats.revenue*0.25, stats.revenue*0.4, stats.revenue*0.5] : revChartRange === "month" ? [stats.revenue*0.2, stats.revenue*0.3, stats.revenue*0.4, stats.revenue*0.1] : [stats.revenue*0.05, stats.revenue*0.06, stats.revenue*0.08, stats.revenue*0.1, stats.revenue*0.15, stats.revenue*0.2, stats.revenue*0.1, 0, 0, 0, 0, 0],
+                      label: 'Revenue (DZD)',
+                      data: revChartRange === "week" 
+                        ? (stats.revenue_evolution?.week || [0, 0, 0, 0, 0, 0, 0])
+                        : revChartRange === "month"
+                        ? (stats.revenue_evolution?.month || [0, 0, 0, 0])
+                        : (stats.revenue_evolution?.year || Array(12).fill(0)),
                       borderColor: '#182FB0',
                       backgroundColor: 'rgba(75,207,231,0.08)',
                       borderWidth: 2.5,
@@ -423,9 +562,11 @@ export default function AdminDashboard() {
               <div className="chart-wrap" style={{ height: "200px" }}>
                 <Doughnut
                   data={{
-                    labels: ['Active Drivers', 'Active Owners', 'Pending', 'Banned'],
+                    labels: ['Drivers', 'Active Owners', 'Pending Owners', 'Rejected'],
                     datasets: [{
-                      data: [stats.activeDrivers, stats.activeOwners, stats.pendingOwners, stats.bannedDrivers],
+                      data: stats.user_distribution && stats.user_distribution.some(v => v > 0)
+                        ? stats.user_distribution
+                        : [stats.drivers, stats.activeOwners, stats.pendingOwners, stats.suspendedOwners],
                       backgroundColor: ['rgba(75,207,231,0.85)', 'rgba(24,47,176,0.85)', 'rgba(245,158,11,0.85)', 'rgba(239,68,68,0.85)'],
                       borderWidth: 0,
                     }]
@@ -441,14 +582,49 @@ export default function AdminDashboard() {
               <table className="tbl">
                 <thead><tr><th>ID</th><th>Parking</th><th>Driver</th><th>Amount</th><th>Commission</th><th>Status</th></tr></thead>
                 <tbody>
-                  <tr><td colSpan={6} style={{ textAlign: "center", padding: "30px", color: "var(--text2)" }}>No recent transactions yet</td></tr>
+                  {stats.recent_transactions && stats.recent_transactions.length > 0 ? (
+                    stats.recent_transactions.map((tx) => (
+                      <tr key={tx.id}>
+                        <td><strong>#{tx.id}</strong></td>
+                        <td>{tx.parking_name}</td>
+                        <td>
+                          {tx.driver_name} 
+                          <span style={{ fontSize: "11px", color: "var(--text3)", display: "block" }}>{tx.plate_number}</span>
+                        </td>
+                        <td><strong>{tx.amount} DZD</strong></td>
+                        <td style={{ color: "var(--success)" }}>+{tx.commission} DZD</td>
+                        <td>
+                          <span className={`badge ${tx.status === 'completed' || tx.status === 'checked_in' || tx.status === 'active' ? 'b-active' : tx.status === 'cancelled' ? 'b-del' : 'b-pending'}`}>
+                            {tx.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: "30px", color: "var(--text2)" }}>No recent transactions yet</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
             <div className="card">
               <div className="card-title">Platform Activity <span>Live</span></div>
-              <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text2)" }}>
-                No recent activity.
+              <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", padding: "6px" }}>
+                {stats.platform_activity && stats.platform_activity.length > 0 ? (
+                  stats.platform_activity.map((act: { action_title: string; details: string; created_at: string; kind?: string }, idx: number) => (
+                    <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "10px", fontSize: "12px", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+                      <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: act.kind === 'admin_log' ? 'var(--primary)' : 'var(--accent)', marginTop: "4px", flexShrink: 0 }}></div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: "600", color: "var(--text1)" }}>{act.action_title}</div>
+                        <div style={{ color: "var(--text2)", fontSize: "11px" }}>{act.details}</div>
+                        <div style={{ color: "var(--text3)", fontSize: "10px" }}>{new Date(act.created_at).toLocaleString('fr-DZ', { timeZone: 'Africa/Algiers' })}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text2)", padding: "40px" }}>
+                    No recent activity.
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -483,7 +659,7 @@ export default function AdminDashboard() {
               <thead><tr><th>Owner</th><th>Email</th><th>Role</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 {pendingOwners
-                  .filter(o => ownerFilter === "" || ownerFilter === "pending")
+                  .filter(() => ownerFilter === "" || ownerFilter === "pending")
                   .map(o => (
                   <tr key={o.id}>
                     <td>
@@ -503,7 +679,7 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
                 {approvedOwners
-                  .filter(o => ownerFilter === "" || ownerFilter === "active")
+                  .filter(() => ownerFilter === "" || ownerFilter === "active")
                   .map(o => (
                   <tr key={o.id}>
                     <td>
@@ -613,23 +789,40 @@ export default function AdminDashboard() {
           
           <div className="tbl-card">
             <table className="tbl">
-              <thead><tr><th>Owner</th><th>Email</th><th>Role</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Owner</th><th>Contact</th><th>Submitted Parking</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 {pendingOwners.map(o => (
                   <tr key={o.id}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <img src={o.avatar || "https://res.cloudinary.com/dw1zljrse/image/upload/v1776985917/gariha1_1_kluzyl.png"} alt={o.full_name} style={{ width: "28px", height: "28px", borderRadius: "50%" }} />
-                        <strong>{o.full_name}</strong>
+                        <img src={o.avatar || "https://res.cloudinary.com/dw1zljrse/image/upload/v1776985917/gariha1_1_kluzyl.png"} alt={o.full_name} style={{ width: "32px", height: "32px", borderRadius: "50%" }} />
+                        <div>
+                          <strong>{o.full_name}</strong>
+                          <div style={{ fontSize: "11px", color: "var(--text3)" }}>ID #{o.id}</div>
+                        </div>
                       </div>
                     </td>
-                    <td>{o.email}</td>
-                    <td>{o.role}</td>
-                    <td>{new Date(o.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <div>{o.email}</div>
+                      {o.phone && <div style={{ fontSize: "11px", color: "var(--text3)" }}>{o.phone}</div>}
+                    </td>
+                    <td>
+                      {o.parking_name ? (
+                        <div>
+                          <strong style={{ color: "var(--primary)" }}>{o.parking_name}</strong>
+                          <div style={{ fontSize: "11px", color: "var(--text2)" }}>📍 {o.location} • {o.total_places || 0} places</div>
+                        </div>
+                      ) : (
+                        <span style={{ color: "var(--text3)", fontStyle: "italic" }}>No parking details attached</span>
+                      )}
+                    </td>
+                    <td>{new Date(o.created_at).toLocaleDateString('fr-DZ', { timeZone: 'Africa/Algiers' })}</td>
                     <td><span className="badge b-pending">Pending</span></td>
                     <td>
-                      <button className="ab ab-ok" onClick={() => handleApprove(o.id)} title="Approve"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg></button>
-                      <button className="ab ab-del" onClick={() => handleReject(o.id)} title="Reject"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button className="ab ab-ok" onClick={() => handleApprove(o.id)} title="Approve Owner"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg></button>
+                        <button className="ab ab-del" onClick={() => handleReject(o.id)} title="Reject Owner"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -719,16 +912,16 @@ export default function AdminDashboard() {
 
         {/* ANALYTICS TAB */}
         <div className={`page ${activeTab === "analytics" ? "active" : ""}`} id="page-analytics">
-          <div className="sh"><div><div className="sh-title">Platform Analytics</div><div className="sh-sub">Deep insights on growth, revenue, and platform activity</div></div><button className="btn btn-primary" onClick={() => showToast("Analytics exported", "ok")}>Export Report</button></div>
+          <div className="sh"><div><div className="sh-title">Platform Analytics</div><div className="sh-sub">Deep insights on growth, revenue, and platform activity (Fuseau horaire Africa/Algiers)</div></div><button className="btn btn-primary" onClick={() => showToast("Analytics exported", "ok")}>Export Report</button></div>
           <div className="grid-2" style={{ marginBottom: "16px" }}>
             <div className="card"><div className="card-title">Revenue by Month <span>Current Year</span></div>
               <div className="chart-wrap" style={{ height: "190px" }}>
                 <Bar
                   data={{
-                    labels: ['Jan', 'Feb', 'Mar', 'Avr', 'Mai', 'Jun'],
+                    labels: ['Jan', 'Feb', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
                     datasets: [{
-                      label: 'Revenue',
-                      data: [0, 0, 0, 0, 0, 0],
+                      label: 'Revenue (DZD)',
+                      data: analyticsData?.revenue_by_month || Array(12).fill(0),
                       backgroundColor: 'rgba(24,47,176,0.12)',
                       borderColor: '#182FB0',
                       borderWidth: 2,
@@ -743,10 +936,10 @@ export default function AdminDashboard() {
               <div className="chart-wrap" style={{ height: "190px" }}>
                 <Line
                   data={{
-                    labels: ['Jan', 'Feb', 'Mar', 'Avr', 'Mai', 'Jun'],
+                    labels: ['Jan', 'Feb', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
                     datasets: [
-                      { label: 'Drivers', data: [0, 0, 0, 0, 0, 0], borderColor: '#4BCFE7', backgroundColor: 'rgba(75,207,231,0.08)', borderWidth: 2.5, tension: .45, fill: true, pointRadius: 3 },
-                      { label: 'Owners', data: [0, 0, 0, 0, 0, 0], borderColor: '#182FB0', backgroundColor: 'transparent', borderWidth: 2, tension: .45, pointRadius: 3 }
+                      { label: 'Drivers', data: analyticsData?.user_acquisition?.drivers || Array(12).fill(0), borderColor: '#4BCFE7', backgroundColor: 'rgba(75,207,231,0.08)', borderWidth: 2.5, tension: .45, fill: true, pointRadius: 3 },
+                      { label: 'Owners', data: analyticsData?.user_acquisition?.owners || Array(12).fill(0), borderColor: '#182FB0', backgroundColor: 'transparent', borderWidth: 2, tension: .45, pointRadius: 3 }
                     ]
                   }}
                   options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { padding: 10, font: { size: 11 } } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#F1F5F9' }, border: { display: false } } } }}
@@ -756,14 +949,28 @@ export default function AdminDashboard() {
           </div>
           <div className="grid-2">
             <div className="card"><div className="card-title">Top Cities by Activity</div>
-              <div style={{ marginTop: "4px", textAlign: "center", color: "var(--text2)", padding: "20px" }}>No data yet.</div>
+              <div style={{ marginTop: "4px", padding: "10px" }}>
+                {analyticsData?.top_cities && analyticsData.top_cities.length > 0 ? (
+                  analyticsData.top_cities.map((city: { city: string; parkings_count: number; reservations_count: number; revenue: number }, idx: number) => (
+                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+                      <div>
+                        <strong style={{ fontSize: "14px", color: "var(--text1)" }}>{city.city || "Emplacement non renseigné"}</strong>
+                        <div style={{ fontSize: "12px", color: "var(--text3)" }}>{city.parkings_count} parkings • {city.reservations_count} réservations</div>
+                      </div>
+                      <div style={{ fontWeight: "700", color: "var(--primary)" }}>{city.revenue} DZD</div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: "center", color: "var(--text2)", padding: "30px" }}>Aucune activité enregistrée par ville.</div>
+                )}
+              </div>
             </div>
             <div className="card"><div className="card-title">Key Platform Metrics</div>
-              <div className="tog-row"><div><div className="tog-title">Cancellation Rate</div><div className="tog-sub">Global average</div></div><strong style={{ color: "var(--warning)" }}>0.0%</strong></div>
-              <div className="tog-row"><div><div className="tog-title">Avg. Reservation Duration</div></div><strong>0h 00m</strong></div>
-              <div className="tog-row"><div><div className="tog-title">Platform Uptime</div><div className="tog-sub">Last 30 days</div></div><strong style={{ color: "var(--success)" }}>100%</strong></div>
-              <div className="tog-row"><div><div className="tog-title">Driver Satisfaction</div></div><strong style={{ color: "var(--success)" }}>0.0 / 5</strong></div>
-              <div className="tog-row"><div><div className="tog-title">Peak Hour</div></div><strong>--:--</strong></div>
+              <div className="tog-row"><div><div className="tog-title">Cancellation Rate</div><div className="tog-sub">Global average</div></div><strong style={{ color: "var(--warning)" }}>{analyticsData?.key_metrics?.cancellation_rate || "0.0%"}</strong></div>
+              <div className="tog-row"><div><div className="tog-title">Avg. Reservation Duration</div></div><strong>{analyticsData?.key_metrics?.avg_duration || "0h 00m"}</strong></div>
+              <div className="tog-row"><div><div className="tog-title">Platform Uptime</div><div className="tog-sub">Live monitoring</div></div><strong style={{ color: "var(--success)" }}>{analyticsData?.key_metrics?.platform_uptime || "99.9%"}</strong></div>
+              <div className="tog-row"><div><div className="tog-title">Driver Satisfaction</div></div><strong style={{ color: "var(--success)" }}>{analyticsData?.key_metrics?.driver_satisfaction || "N/A (No reviews yet)"}</strong></div>
+              <div className="tog-row"><div><div className="tog-title">Peak Hour</div></div><strong>{analyticsData?.key_metrics?.peak_hour || "--:--"}</strong></div>
             </div>
           </div>
         </div>

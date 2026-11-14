@@ -9,21 +9,24 @@ export default function Messaging({ owner }) {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef(null);
 
-  const fetchMessages = async () => {
-    try {
-      const res = await api.get('/messages/my');
-      setMessages(res.data);
-    } catch (e) {
-      console.error("Failed to fetch messages", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+    const fetchMessages = async () => {
+      try {
+        const res = await api.get('/messages/my');
+        if (isMounted) setMessages(res.data);
+      } catch (e) {
+        console.error("Failed to fetch messages", e);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
     fetchMessages();
     const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {

@@ -3,45 +3,76 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { ArrowLeft, Search, MapPin, CheckCircle2, ChevronRight, User, Hash, Loader2, Car, Clock, ShieldAlert } from "lucide-react";
+import { ArrowLeft, MapPin, CheckCircle2, User, Hash, Loader2, Car, Clock, ShieldAlert } from "lucide-react";
 import { api } from "../../lib/axios";
 import { useRouter } from "next/navigation";
 
+interface ParkingItem {
+  id: number;
+  parking_name: string;
+  location: string;
+  total_places: number;
+  available_places: number;
+}
+
+interface SpotItem {
+  id: number;
+  name: string;
+  status: string;
+}
+
+interface ReservationSuccess {
+  id: number;
+  start_time: string;
+  end_time: string;
+  total_price: number;
+  access_token?: string;
+  spot_number?: string;
+  spot_name?: string;
+  parking_name?: string;
+  driver_name?: string;
+  plate_number?: string;
+}
+
 export default function BookingPage() {
   const router = useRouter();
-  const [parkings, setParkings] = useState<any[]>([]);
+  const [parkings, setParkings] = useState<ParkingItem[]>([]);
   const [loadingParkings, setLoadingParkings] = useState(true);
   
-  const [selectedParking, setSelectedParking] = useState<any>(null);
-  const [spots, setSpots] = useState<any[]>([]);
+  const [selectedParking, setSelectedParking] = useState<ParkingItem | null>(null);
+  const [spots, setSpots] = useState<SpotItem[]>([]);
   const [loadingSpots, setLoadingSpots] = useState(false);
   
-  const [selectedSpot, setSelectedSpot] = useState<any>(null);
+  const [selectedSpot, setSelectedSpot] = useState<SpotItem | null>(null);
   const [driverName, setDriverName] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
   const [duration, setDuration] = useState("60");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   
-  const [successReservation, setSuccessReservation] = useState<any>(null);
+  const [successReservation, setSuccessReservation] = useState<ReservationSuccess | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    const fetchParkings = async () => {
+      try {
+        const res = await api.get("/reservations/public/parkings");
+        if (isMounted) setParkings(res.data);
+      } catch (e) {
+        console.error(e);
+        if (isMounted) setErrorMsg("Failed to load parkings");
+      } finally {
+        if (isMounted) setLoadingParkings(false);
+      }
+    };
+
     fetchParkings();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const fetchParkings = async () => {
-    try {
-      const res = await api.get("/reservations/public/parkings");
-      setParkings(res.data);
-    } catch (e) {
-      console.error(e);
-      setErrorMsg("Failed to load parkings");
-    } finally {
-      setLoadingParkings(false);
-    }
-  };
-
-  const handleSelectParking = async (parking: any) => {
+  const handleSelectParking = async (parking: ParkingItem) => {
     setSelectedParking(parking);
     setSelectedSpot(null);
     setLoadingSpots(true);
@@ -74,10 +105,11 @@ export default function BookingPage() {
         duration_minutes: parseInt(duration)
       });
       setSuccessReservation(res.data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (err.response?.status === 409) {
-        setErrorMsg(err.response.data.detail || "This spot is no longer available. Please select another one.");
+      const apiErr = err as { response?: { status?: number; data?: { detail?: string } } };
+      if (apiErr.response?.status === 409) {
+        setErrorMsg(apiErr.response.data?.detail || "This spot is no longer available. Please select another one.");
         if (selectedParking) handleSelectParking(selectedParking);
         setSelectedSpot(null);
       } else {
@@ -128,9 +160,14 @@ export default function BookingPage() {
             </div>
           </div>
           
-          <button onClick={() => router.push('/')} className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-[#0F1E7A] to-[#1A2FA8] text-white shadow-[0_8px_30px_rgba(15,30,122,0.3)] hover:-translate-y-0.5 transition-all">
-            Return to Home
-          </button>
+          <div className="flex flex-col gap-3">
+            <button onClick={() => router.push('/driver')} className="w-full py-3.5 rounded-xl font-bold text-base bg-gradient-to-r from-[#10B981] to-[#059669] text-white shadow-md hover:-translate-y-0.5 transition-all">
+              Voir &amp; suivre ma réservation
+            </button>
+            <button onClick={() => router.push('/')} className="w-full py-3 rounded-xl font-bold text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">
+              Retour à l&apos;accueil
+            </button>
+          </div>
         </motion.div>
       </div>
     );
@@ -142,9 +179,12 @@ export default function BookingPage() {
       <div className="absolute bottom-[-200px] left-[-150px] w-[700px] h-[700px] rounded-full bg-[#4DCCE7]/[0.09] blur-[120px] -z-10"></div>
       
       <header className="absolute top-0 inset-x-0 p-6 z-50">
-        <div className="max-w-7xl mx-auto flex justify-start items-center">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
             <ArrowLeft size={16} /> Back to Home
+          </Link>
+          <Link href="/driver" className="flex items-center gap-2 text-sm font-bold text-[#1A2FA8] bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-200 hover:shadow-sm transition-all">
+            <Car size={16} /> Suivi de mes réservations
           </Link>
         </div>
       </header>
@@ -178,7 +218,7 @@ export default function BookingPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {parkings.map((p: any) => (
+                {parkings.map((p: ParkingItem) => (
                   <button 
                     key={p.id}
                     onClick={() => handleSelectParking(p)}
@@ -221,7 +261,7 @@ export default function BookingPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 gap-3 mb-8">
-                      {spots.map((s: any) => (
+                      {spots.map((s: SpotItem) => (
                         <button
                           key={s.id}
                           onClick={() => setSelectedSpot(s)}

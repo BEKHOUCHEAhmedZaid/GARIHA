@@ -32,9 +32,9 @@ export function getPool(): Pool {
   return pool;
 }
 
-export async function query<T extends QueryResultRow = any>(
+export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
-  params?: any[]
+  params?: (string | number | boolean | null | string[])[]
 ): Promise<QueryResult<T>> {
   await ensureTables();
   const p = getPool();
@@ -129,6 +129,17 @@ export async function ensureTables(): Promise<void> {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS parking_access_rules (
+      id SERIAL PRIMARY KEY,
+      parking_id INTEGER REFERENCES parkings(id) ON DELETE CASCADE,
+      driver_name VARCHAR(255) NOT NULL,
+      plate_number VARCHAR(100) NOT NULL,
+      rule_type VARCHAR(50) DEFAULT 'whitelist',
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ
+    );
+
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     CREATE INDEX IF NOT EXISTS idx_parkings_owner ON parkings(owner_id);
     CREATE INDEX IF NOT EXISTS idx_parking_spots_parking ON parking_spots(parking_id);
@@ -136,6 +147,8 @@ export async function ensureTables(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_reservations_driver ON reservations(driver_id);
     CREATE INDEX IF NOT EXISTS idx_notifications_receiver ON notifications(receiver_id);
     CREATE INDEX IF NOT EXISTS idx_messages_participants ON messages(sender_id, receiver_id);
+    CREATE INDEX IF NOT EXISTS idx_access_rules_parking ON parking_access_rules(parking_id);
+    CREATE INDEX IF NOT EXISTS idx_access_rules_plate ON parking_access_rules(plate_number);
   `);
 
   tablesInitialized = true;

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, createContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/axios';
 import s from './OwnerDashboard.module.css';
 import Sidebar from './Sidebar';
@@ -16,6 +16,23 @@ import Messaging from './Messaging';
 import { LangContext, TRANSLATIONS } from './LangContext';
 
 
+interface OwnerUser {
+  id: number;
+  full_name: string;
+  email: string;
+  phone?: string;
+  status: string;
+  created_at?: string;
+}
+interface DashboardData {
+  parkings?: Array<{ id: number; parking_name: string }>;
+  total_places?: number;
+  monthly_revenue?: number;
+  occupancy_trend?: number[];
+  revenue_trend?: number[];
+  recent_activity?: Array<Record<string, unknown>>;
+}
+
 export default function OwnerDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,8 +43,8 @@ export default function OwnerDashboard() {
     return 'en';
   });
 
-  const [owner, setOwner] = useState<any>(null);
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [owner, setOwner] = useState<OwnerUser | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load language preference and fetch data

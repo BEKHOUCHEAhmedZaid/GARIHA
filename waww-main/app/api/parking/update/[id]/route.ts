@@ -24,7 +24,7 @@ export async function PUT(
 
     const body = await req.json();
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean)[] = [];
 
     const allowed = [
       "parking_name",

@@ -23,6 +23,20 @@ export default function Overview({ owner, dashboardData }) {
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+  const occData = dashboardData?.occupancy_trend || [0, 0, 0, 0, 0, 0, 0];
+  const hasOccData = occData.some(v => v > 0);
+  const occPoints = occData.map((val, i) => {
+    const x = 32 + i * 76.3;
+    const y = 168 - (Math.min(100, Math.max(0, val)) / 100) * 120;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const revData = dashboardData?.revenue_trend || [0, 0, 0, 0, 0, 0, 0];
+  const maxRev = Math.max(...revData, 1);
+  const hasRevData = revData.some(v => v > 0);
+
+  const activities = dashboardData?.recent_activity || [];
+
   return (
     <div className={s.overview}>
       <div className={s.header}>
@@ -32,8 +46,6 @@ export default function Overview({ owner, dashboardData }) {
         </div>
         <div className={s.dateChip}>{dateStr}</div>
       </div>
-
-
 
       <div className={s.kpiGrid}>
         {KPI_DATA.map((kpi, i) => (
@@ -53,8 +65,18 @@ export default function Overview({ owner, dashboardData }) {
           <h3>{t.occupancyTrend || 'Occupancy Trend'}</h3>
           <div className={s.svgWrapper}>
             <svg viewBox="0 0 500 200" className={s.svgChart}>
-              <path d="M 32 168 L 100 168 L 178 168 L 256 168 L 334 168 L 412 168 L 490 168 L 490 168 L 32 168 Z" fill="url(#grad1)" />
-              <polyline fill="none" stroke="#1A2FA8" strokeWidth="3" points="32,168 100,168 178,168 256,168 334,168 412,168 490,168" />
+              {hasOccData && (
+                <polygon 
+                  points={`32,168 ${occPoints} 490,168`} 
+                  fill="url(#grad1)" 
+                />
+              )}
+              <polyline 
+                fill="none" 
+                stroke="#1A2FA8" 
+                strokeWidth="3" 
+                points={hasOccData ? occPoints : "32,168 100,168 178,168 256,168 334,168 412,168 490,168"} 
+              />
               <line x1="32" y1="168" x2="490" y2="168" stroke="#E5E7EB" strokeWidth="2" />
               {days.map((d, i) => (
                 <text key={d} x={32 + i * 76.3} y="190" fontSize="12" fill="#6B7280" textAnchor="middle">{d}</text>
@@ -66,7 +88,7 @@ export default function Overview({ owner, dashboardData }) {
                 </linearGradient>
               </defs>
             </svg>
-            <div className={s.overlayText}>{t.noDataYet || 'No data yet'}</div>
+            {!hasOccData && <div className={s.overlayText}>{t.noDataYet || 'No data yet'}</div>}
           </div>
         </div>
 
@@ -75,12 +97,23 @@ export default function Overview({ owner, dashboardData }) {
           <div className={s.svgWrapper}>
             <svg viewBox="0 0 500 200" className={s.svgChart}>
               <line x1="32" y1="168" x2="490" y2="168" stroke="#E5E7EB" strokeWidth="2" />
-              {days.map((d, i) => (
-                <g key={d}>
-                  <rect x={16 + i * 76.3} y="168" width="32" height="0" fill="url(#grad2)" rx="4" />
-                  <text x={32 + i * 76.3} y="190" fontSize="12" fill="#6B7280" textAnchor="middle">{d}</text>
-                </g>
-              ))}
+              {days.map((d, i) => {
+                const val = revData[i] || 0;
+                const barHeight = hasRevData ? (val / maxRev) * 120 : 0;
+                return (
+                  <g key={d}>
+                    <rect 
+                      x={16 + i * 76.3} 
+                      y={168 - barHeight} 
+                      width="32" 
+                      height={barHeight} 
+                      fill="url(#grad2)" 
+                      rx="4" 
+                    />
+                    <text x={32 + i * 76.3} y="190" fontSize="12" fill="#6B7280" textAnchor="middle">{d}</text>
+                  </g>
+                );
+              })}
               <defs>
                 <linearGradient id="grad2" x1="0%" y1="0%" x2="0%" y2="100%">
                   <stop offset="0%" style={{ stopColor: '#4DCCE7', stopOpacity: 1 }} />
@@ -88,18 +121,62 @@ export default function Overview({ owner, dashboardData }) {
                 </linearGradient>
               </defs>
             </svg>
-            <div className={s.overlayText}>{t.noRevenueDataYet || 'No revenue data yet'}</div>
+            {!hasRevData && <div className={s.overlayText}>{t.noRevenueDataYet || 'No revenue data yet'}</div>}
           </div>
         </div>
       </div>
 
       <div className={s.recentActivity}>
         <h3>{t.recentActivity || 'Recent Activity'}</h3>
-        <div className={s.emptyActivity}>
-          <div className={s.emptyIcon}>◷</div>
-          <p className={s.emptyTitle}>{t.noActivityYet || 'No activity yet'}</p>
-          <p className={s.emptyText}>{t.activityWillAppear || 'Activity will appear here once drivers start using your parking.'}</p>
-        </div>
+        {activities.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+            {activities.map((act) => (
+              <div 
+                key={act.id} 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  background: '#F9FAFB', 
+                  padding: '14px 18px', 
+                  borderRadius: '12px', 
+                  border: '1px solid #E5E7EB' 
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(26,47,168,0.1)', color: '#1A2FA8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                    P
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '14px', color: '#111827' }}>{act.driver_name}</strong>
+                    <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                      {act.plate_number} • Spot {act.spot_name} ({act.parking_name})
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: '700', color: '#1A2FA8', fontSize: '14px' }}>{act.price} DZD</div>
+                  <span style={{ 
+                    fontSize: '11px', 
+                    padding: '2px 8px', 
+                    borderRadius: '10px', 
+                    fontWeight: '600',
+                    background: act.status === 'active' ? '#ECFDF5' : act.status === 'checked_in' ? '#EFF6FF' : '#F3F4F6',
+                    color: act.status === 'active' ? '#059669' : act.status === 'checked_in' ? '#2563EB' : '#4B5563'
+                  }}>
+                    {act.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={s.emptyActivity}>
+            <div className={s.emptyIcon}>◷</div>
+            <p className={s.emptyTitle}>{t.noActivityYet || 'No activity yet'}</p>
+            <p className={s.emptyText}>{t.activityWillAppear || 'Activity will appear here once drivers start using your parking.'}</p>
+          </div>
+        )}
       </div>
     </div>
   );

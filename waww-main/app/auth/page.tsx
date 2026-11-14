@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ShieldCheck, CheckCircle2, Lock, ChevronRight, User, Loader2, Building, Mail, Phone, MapPin, Hash, Eye, EyeOff, Clock } from "lucide-react";
+import { ArrowLeft, ShieldCheck, CheckCircle2, Lock, ChevronRight, User, Loader2, Building, Mail, Phone, MapPin, Hash, Eye, EyeOff, Clock, Car, AlertCircle } from "lucide-react";
 import { useGoogleLogin } from "@react-oauth/google";
 import { api } from "../../lib/axios";
 
@@ -20,7 +20,7 @@ const GoogleIcon = () => (
 
 export default function AuthPage() {
   const router = useRouter();
-  const [role, setRole] = useState<'none' | 'owner' | 'admin'>('none');
+  const [role, setRole] = useState<'none' | 'owner' | 'admin' | 'driver'>('none');
   
   // Auth State
   const [firstName, setFirstName] = useState("");
@@ -31,6 +31,14 @@ export default function AuthPage() {
   const [showPw, setShowPw] = useState(false);
   const [ownerForm, setOwnerForm] = useState({ firstName: '', lastName: '', parkingName: '', location: '', spots: '', phone: '', email: '', password: '' });
   const [ownerLogin, setOwnerLogin] = useState({ email: '', password: '' });
+
+  // Driver Auth State
+  const [driverTab, setDriverTab] = useState<'login' | 'register'>('login');
+  const [driverForm, setDriverForm] = useState({ firstName: '', lastName: '', email: '', password: '', phone: '', plateNumber: '' });
+  const [driverLogin, setDriverLogin] = useState({ email: '', password: '' });
+  const [driverLoading, setDriverLoading] = useState(false);
+  const [driverError, setDriverError] = useState('');
+  const [showDriverPw, setShowDriverPw] = useState(false);
 
   // Admin Login State
   const [adminLogin, setAdminLogin] = useState({ email: '', password: '' });
@@ -59,6 +67,8 @@ export default function AuthPage() {
          }
          setGoogleAuthStatus('verified');
          setTimeout(() => router.push('/admin'), 1000);
+      } else if (user.role === "driver") {
+         router.push('/driver');
       } else {
          if (role === 'admin') {
            alert("You do not have admin privileges. Redirecting to owner portal.");
@@ -75,6 +85,68 @@ export default function AuthPage() {
       if (role === 'owner') setOwnerStep('form');
       else setGoogleAuthStatus('idle');
       alert("Google authentication failed. Please try again.");
+    }
+  };
+
+  const handleDriverRegister = async () => {
+    if (!driverForm.firstName.trim() || !driverForm.lastName.trim() || !driverForm.email.trim() || !driverForm.password.trim()) {
+      setDriverError("Veuillez remplir tous les champs obligatoires.");
+      return;
+    }
+    setDriverLoading(true);
+    setDriverError('');
+    try {
+      await api.post("/auth/register", {
+        first_name: driverForm.firstName,
+        last_name: driverForm.lastName,
+        email: driverForm.email,
+        password: driverForm.password,
+        phone: driverForm.phone,
+        plate_number: driverForm.plateNumber,
+      });
+      // Automatically log in
+      const res = await api.post("/auth/login", {
+        email: driverForm.email,
+        password: driverForm.password,
+      });
+      localStorage.setItem("gariha_token", res.data.access_token);
+      router.push('/driver');
+    } catch (err: unknown) {
+      console.error(err);
+      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setDriverError(message || "Échec de l'inscription conducteur.");
+    } finally {
+      setDriverLoading(false);
+    }
+  };
+
+  const handleDriverLogin = async () => {
+    if (!driverLogin.email.trim() || !driverLogin.password.trim()) {
+      setDriverError("Veuillez saisir votre email et mot de passe.");
+      return;
+    }
+    setDriverLoading(true);
+    setDriverError('');
+    try {
+      const res = await api.post("/auth/login", {
+        email: driverLogin.email,
+        password: driverLogin.password,
+      });
+      localStorage.setItem("gariha_token", res.data.access_token);
+      const userRes = await api.get("/auth/me");
+      if (userRes.data.role === "admin") {
+        router.push('/admin');
+      } else if (userRes.data.role === "owner") {
+        router.push('/owner');
+      } else {
+        router.push('/driver');
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setDriverError(message || "Email ou mot de passe incorrect.");
+    } finally {
+      setDriverLoading(false);
     }
   };
 
@@ -115,7 +187,11 @@ export default function AuthPage() {
       const userRes = await api.get("/auth/me");
       const user = userRes.data;
       
-      if (user.status === "approved") {
+      if (user.role === "driver") {
+        router.push('/driver');
+      } else if (user.role === "admin") {
+        router.push('/admin');
+      } else if (user.status === "approved") {
         router.push('/owner');
       } else {
         setOwnerStep('pending');
@@ -209,33 +285,233 @@ export default function AuthPage() {
                 <p className="text-lg text-slate-500">Select your account type to continue your journey with us.</p>
               </div>
               
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Parking Owner Card */}
-                <button onClick={() => setRole('owner')} className="group relative bg-white/70 backdrop-blur-md rounded-[2rem] p-10 text-left border border-white shadow-[0_8px_30px_rgba(15,30,122,0.06)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.12)] transition-all duration-500 overflow-hidden text-slate-900">
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-[#4DCCE7]/10 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1A2FA8]/10 to-[#4DCCE7]/10 flex items-center justify-center mb-8 group-hover:bg-gradient-to-br group-hover:from-[#1A2FA8] group-hover:to-[#4DCCE7] group-hover:text-white transition-all duration-500 text-[#1A2FA8]">
-                    <Building size={32} />
+              <div className="grid md:grid-cols-3 gap-6">
+                {/* Driver Card */}
+                <button onClick={() => setRole('driver')} className="group relative bg-white/80 backdrop-blur-md rounded-[2rem] p-8 text-left border border-white shadow-[0_8px_30px_rgba(15,30,122,0.06)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.15)] transition-all duration-500 overflow-hidden text-slate-900">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#10B981]/15 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#10B981]/10 to-[#059669]/20 flex items-center justify-center mb-6 group-hover:bg-gradient-to-br group-hover:from-[#10B981] group-hover:to-[#047857] group-hover:text-white transition-all duration-500 text-[#059669]">
+                    <Car size={28} />
                   </div>
-                  <h2 className="text-2xl font-extrabold text-[#0F1E7A] mb-3" style={{ fontFamily: 'var(--font-display)' }}>Parking Owner</h2>
-                  <p className="text-slate-500 mb-8 leading-relaxed">List your parking space, manage availability, and turn your empty spot into a steady revenue stream.</p>
-                  <div className="flex items-center gap-2 text-[#1A2FA8] font-bold text-sm uppercase tracking-wide">
-                    Continue as Owner <ChevronRight size={16} className="group-hover:translate-x-2 transition-transform duration-300" />
+                  <h2 className="text-xl font-extrabold text-[#0F1E7A] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Conducteur</h2>
+                  <p className="text-slate-500 mb-6 text-sm leading-relaxed">Réservez vos places en temps réel, suivez vos réservations et changez de place en direct.</p>
+                  <div className="flex items-center gap-2 text-[#059669] font-bold text-xs uppercase tracking-wide">
+                    Espace Conducteur <ChevronRight size={14} className="group-hover:translate-x-1.5 transition-transform duration-300" />
+                  </div>
+                </button>
+
+                {/* Parking Owner Card */}
+                <button onClick={() => setRole('owner')} className="group relative bg-white/70 backdrop-blur-md rounded-[2rem] p-8 text-left border border-white shadow-[0_8px_30px_rgba(15,30,122,0.06)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.12)] transition-all duration-500 overflow-hidden text-slate-900">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#4DCCE7]/10 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1A2FA8]/10 to-[#4DCCE7]/10 flex items-center justify-center mb-6 group-hover:bg-gradient-to-br group-hover:from-[#1A2FA8] group-hover:to-[#4DCCE7] group-hover:text-white transition-all duration-500 text-[#1A2FA8]">
+                    <Building size={28} />
+                  </div>
+                  <h2 className="text-xl font-extrabold text-[#0F1E7A] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Propriétaire</h2>
+                  <p className="text-slate-500 mb-6 text-sm leading-relaxed">Gérez vos parkings, analysez vos revenus et pilotez le contrôle d&apos;accès à vos places.</p>
+                  <div className="flex items-center gap-2 text-[#1A2FA8] font-bold text-xs uppercase tracking-wide">
+                    Espace Propriétaire <ChevronRight size={14} className="group-hover:translate-x-1.5 transition-transform duration-300" />
                   </div>
                 </button>
 
                 {/* Admin Card */}
-                <button onClick={() => setRole('admin')} className="group relative bg-[#0F1E7A] rounded-[2rem] p-10 text-left border border-[#1A2FA8] shadow-[0_8px_30px_rgba(15,30,122,0.15)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.3)] transition-all duration-500 overflow-hidden text-white">
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-[#4DCCE7]/20 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
-                  <div className="absolute bottom-0 left-0 w-full h-full bg-gradient-to-t from-[#1A2FA8]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"></div>
-                  <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-8 group-hover:bg-white group-hover:text-[#0F1E7A] transition-all duration-500 border border-white/20">
-                    <ShieldCheck size={32} />
+                <button onClick={() => setRole('admin')} className="group relative bg-[#0F1E7A] rounded-[2rem] p-8 text-left border border-[#1A2FA8] shadow-[0_8px_30px_rgba(15,30,122,0.15)] hover:shadow-[0_20px_50px_rgba(15,30,122,0.3)] transition-all duration-500 overflow-hidden text-white">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#4DCCE7]/20 to-transparent rounded-bl-full -z-10 transition-transform duration-500 group-hover:scale-110"></div>
+                  <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-6 group-hover:bg-white group-hover:text-[#0F1E7A] transition-all duration-500 border border-white/20">
+                    <ShieldCheck size={28} />
                   </div>
-                  <h2 className="text-2xl font-extrabold mb-3" style={{ fontFamily: 'var(--font-display)' }}>Administrator</h2>
-                  <p className="text-white/70 mb-8 leading-relaxed">Secure access for system administrators to oversee operations, manage users, and monitor platform health.</p>
-                  <div className="flex items-center gap-2 text-[#4DCCE7] font-bold text-sm uppercase tracking-wide">
-                    Access Portal <ChevronRight size={16} className="group-hover:translate-x-2 transition-transform duration-300" />
+                  <h2 className="text-xl font-extrabold mb-2" style={{ fontFamily: 'var(--font-display)' }}>Administrateur</h2>
+                  <p className="text-white/70 mb-6 text-sm leading-relaxed">Supervisez la plateforme, validez les propriétaires et auditez les transactions réelles.</p>
+                  <div className="flex items-center gap-2 text-[#4DCCE7] font-bold text-xs uppercase tracking-wide">
+                    Portail Admin <ChevronRight size={14} className="group-hover:translate-x-1.5 transition-transform duration-300" />
                   </div>
                 </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* DRIVER AUTH FLOW */}
+          {role === 'driver' && (
+            <motion.div key="driver-auth" variants={fadeInUp} initial="hidden" animate="visible" exit="exit" className="w-full max-w-xl mx-auto">
+              <button onClick={() => { setRole('none'); setDriverError(''); }} className="mb-6 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0F1E7A] transition-colors">
+                <ArrowLeft size={16} /> Retour au choix du compte
+              </button>
+
+              <div className="bg-white/85 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_80px_rgba(15,30,122,0.08)] border border-white p-8 md:p-12 relative overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-[#10B981] via-[#059669] to-[#047857]"></div>
+
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#10B981]/15 to-[#059669]/20 flex items-center justify-center mx-auto mb-4 text-[#059669]">
+                    <Car size={32} />
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-[#0F1E7A]" style={{ fontFamily: 'var(--font-display)' }}>
+                    {driverTab === 'login' ? 'Connexion Conducteur' : 'Inscription Conducteur'}
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-2">
+                    {driverTab === 'login' ? 'Accédez à vos réservations et vos places en direct' : 'Rejoignez GARIHA pour réserver et suivre vos places'}
+                  </p>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex bg-slate-100 p-1.5 rounded-xl mb-6">
+                  <button 
+                    onClick={() => { setDriverTab('login'); setDriverError(''); }} 
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${driverTab === 'login' ? 'bg-white text-[#0F1E7A] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Connexion
+                  </button>
+                  <button 
+                    onClick={() => { setDriverTab('register'); setDriverError(''); }} 
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${driverTab === 'register' ? 'bg-white text-[#0F1E7A] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Créer un compte
+                  </button>
+                </div>
+
+                {driverError && (
+                  <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium flex items-center gap-2">
+                    <AlertCircle size={18} className="flex-shrink-0" />
+                    <span>{driverError}</span>
+                  </div>
+                )}
+
+                {/* LOGIN FORM */}
+                {driverTab === 'login' && (
+                  <form onSubmit={(e) => { e.preventDefault(); handleDriverLogin(); }} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Adresse Email</label>
+                      <div className="relative">
+                        <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                          type="email" 
+                          required 
+                          value={driverLogin.email} 
+                          onChange={e => setDriverLogin({...driverLogin, email: e.target.value})} 
+                          className={inputCls} 
+                          placeholder="votre.email@exemple.dz" 
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Mot de passe</label>
+                      <div className="relative">
+                        <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                          type={showDriverPw ? "text" : "password"} 
+                          required 
+                          value={driverLogin.password} 
+                          onChange={e => setDriverLogin({...driverLogin, password: e.target.value})} 
+                          className="w-full pl-11 pr-12 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#10B981] transition-all outline-none text-sm font-medium" 
+                          placeholder="Votre mot de passe" 
+                        />
+                        <button type="button" onClick={() => setShowDriverPw(!showDriverPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                          {showDriverPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={driverLoading} 
+                      className="w-full py-4 rounded-xl bg-gradient-to-r from-[#10B981] to-[#047857] text-white font-bold text-base shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 mt-4"
+                    >
+                      {driverLoading ? <Loader2 size={20} className="animate-spin" /> : "Se connecter"}
+                    </button>
+                  </form>
+                )}
+
+                {/* REGISTER FORM */}
+                {driverTab === 'register' && (
+                  <form onSubmit={(e) => { e.preventDefault(); handleDriverRegister(); }} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Prénom</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={driverForm.firstName} 
+                          onChange={e => setDriverForm({...driverForm, firstName: e.target.value})} 
+                          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium outline-none focus:border-[#10B981]" 
+                          placeholder="Ahmed" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Nom</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={driverForm.lastName} 
+                          onChange={e => setDriverForm({...driverForm, lastName: e.target.value})} 
+                          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium outline-none focus:border-[#10B981]" 
+                          placeholder="Benali" 
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Adresse Email</label>
+                      <input 
+                        type="email" 
+                        required 
+                        value={driverForm.email} 
+                        onChange={e => setDriverForm({...driverForm, email: e.target.value})} 
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium outline-none focus:border-[#10B981]" 
+                        placeholder="ahmed@exemple.dz" 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Mot de passe</label>
+                      <input 
+                        type="password" 
+                        required 
+                        value={driverForm.password} 
+                        onChange={e => setDriverForm({...driverForm, password: e.target.value})} 
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium outline-none focus:border-[#10B981]" 
+                        placeholder="Au moins 6 caractères" 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Téléphone</label>
+                        <input 
+                          type="tel" 
+                          value={driverForm.phone} 
+                          onChange={e => setDriverForm({...driverForm, phone: e.target.value})} 
+                          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium outline-none focus:border-[#10B981]" 
+                          placeholder="0550 12 34 56" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1.5">Immatriculation</label>
+                        <input 
+                          type="text" 
+                          value={driverForm.plateNumber} 
+                          onChange={e => setDriverForm({...driverForm, plateNumber: e.target.value})} 
+                          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium outline-none focus:border-[#10B981] uppercase" 
+                          placeholder="16-12345-12" 
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={driverLoading} 
+                      className="w-full py-4 rounded-xl bg-gradient-to-r from-[#10B981] to-[#047857] text-white font-bold text-base shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 mt-4"
+                    >
+                      {driverLoading ? <Loader2 size={20} className="animate-spin" /> : "Créer mon compte conducteur"}
+                    </button>
+                  </form>
+                )}
+
+                <div className="mt-6 pt-6 border-t border-slate-100 text-center">
+                  <button 
+                    onClick={() => loginWithGoogle()} 
+                    className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-all text-sm"
+                  >
+                    <GoogleIcon /> Continuer avec Google
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}

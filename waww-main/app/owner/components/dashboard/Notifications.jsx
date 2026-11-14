@@ -6,19 +6,20 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await api.get('/notifications/my');
-      setNotifications(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.get('/notifications/my');
+        if (isMounted) setNotifications(res.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
     fetchNotifications();
+    return () => { isMounted = false; };
   }, []);
 
   const markAsRead = async (id) => {

@@ -13,7 +13,14 @@ export async function GET(req: Request) {
       [admin.id]
     );
 
-    const conversations: Record<number, any> = {};
+    const conversations: Record<number, {
+      user_id: number;
+      full_name: string;
+      avatar: string;
+      last_message: string;
+      last_message_time: string;
+      unread_count: number;
+    }> = {};
 
     for (const m of res.rows) {
       const otherId = m.receiver_id === admin.id ? m.sender_id : m.receiver_id;

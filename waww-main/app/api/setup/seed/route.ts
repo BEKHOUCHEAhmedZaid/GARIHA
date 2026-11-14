@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     // Create or find a demo owner
     const demoOwnerEmail = "owner.demo@gariha.com";
-    let ownerRes = await query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [
+    const ownerRes = await query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [
       demoOwnerEmail,
     ]);
 
