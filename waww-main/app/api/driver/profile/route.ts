@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireUser, handleApiError } from "@/lib/auth";
+import { requireUser, handleApiError, verifyPassword, hashPassword } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
@@ -49,6 +49,78 @@ export async function GET(req: Request) {
       created_at: user.created_at,
       total_reservations: totalReservations,
       active_reservation: activeData,
+    });
+  } catch (err) {
+    return handleApiError(err);
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const user = await requireUser(req);
+    const body = await req.json();
+    const { full_name, phone, plate_number, current_password, new_password } = body;
+
+    if (!full_name || !full_name.trim()) {
+      return NextResponse.json({ detail: "Le nom complet est obligatoire." }, { status: 400 });
+    }
+
+    // Password change verification if provided
+    if (new_password) {
+      if (!current_password) {
+        return NextResponse.json({ detail: "Veuillez saisir votre mot de passe actuel." }, { status: 400 });
+      }
+      if (new_password.length < 6) {
+        return NextResponse.json({ detail: "Le nouveau mot de passe doit comporter au moins 6 caractères." }, { status: 400 });
+      }
+
+      // Fetch user's current hashed_password
+      const userRes = await query("SELECT hashed_password FROM users WHERE id = $1", [user.id]);
+      const currentHashed = userRes.rows[0]?.hashed_password;
+
+      if (!currentHashed) {
+        return NextResponse.json({ detail: "Impossible de modifier le mot de passe pour ce compte." }, { status: 400 });
+      }
+
+      const isMatch = await verifyPassword(current_password, currentHashed);
+      if (!isMatch) {
+        return NextResponse.json({ detail: "Le mot de passe actuel est incorrect." }, { status: 400 });
+      }
+
+      const newHashed = await hashPassword(new_password);
+      await query("UPDATE users SET hashed_password = $1 WHERE id = $2", [newHashed, user.id]);
+    }
+
+    // Update profile info
+    const updateRes = await query(
+      `UPDATE users 
+       SET full_name = $1, 
+           phone = $2, 
+           plate_number = $3, 
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, full_name, email, phone, plate_number, role, created_at`,
+      [
+        full_name.trim(),
+        phone ? phone.trim() : null,
+        plate_number ? plate_number.trim().toUpperCase() : null,
+        user.id,
+      ]
+    );
+
+    const updated = updateRes.rows[0];
+
+    return NextResponse.json({
+      message: "Profil mis à jour avec succès !",
+      user: {
+        id: updated.id,
+        full_name: updated.full_name,
+        email: updated.email,
+        phone: updated.phone,
+        plate_number: updated.plate_number,
+        role: updated.role,
+        created_at: updated.created_at,
+      },
     });
   } catch (err) {
     return handleApiError(err);

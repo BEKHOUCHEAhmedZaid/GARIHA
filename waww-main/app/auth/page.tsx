@@ -20,7 +20,22 @@ const GoogleIcon = () => (
 
 export default function AuthPage() {
   const router = useRouter();
-  const [role, setRole] = useState<'none' | 'owner' | 'admin' | 'driver'>('none');
+  const [role, setRole] = useState<'none' | 'owner' | 'admin' | 'driver'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const roleParam = params.get('role');
+      if (roleParam === 'driver' || roleParam === 'owner' || roleParam === 'admin') {
+        return roleParam;
+      }
+    }
+    return 'none';
+  });
+
+  const getRedirectUrl = (defaultUrl: string) => {
+    if (typeof window === 'undefined') return defaultUrl;
+    const redirect = new URLSearchParams(window.location.search).get('redirect');
+    return redirect && redirect.startsWith('/') ? redirect : defaultUrl;
+  };
   
   // Auth State
   const [firstName, setFirstName] = useState("");
@@ -66,16 +81,16 @@ export default function AuthPage() {
            setRole('admin');
          }
          setGoogleAuthStatus('verified');
-         setTimeout(() => router.push('/admin'), 1000);
+         setTimeout(() => router.push(getRedirectUrl('/admin')), 1000);
       } else if (user.role === "driver") {
-         router.push('/driver');
+         router.push(getRedirectUrl('/driver'));
       } else {
          if (role === 'admin') {
            alert("You do not have admin privileges. Redirecting to owner portal.");
            setRole('owner');
          }
          if (user.status === "approved") {
-            router.push('/owner');
+            router.push(getRedirectUrl('/owner'));
          } else {
             setOwnerStep('pending');
          }
@@ -110,7 +125,7 @@ export default function AuthPage() {
         password: driverForm.password,
       });
       localStorage.setItem("gariha_token", res.data.access_token);
-      router.push('/driver');
+      router.push(getRedirectUrl('/driver'));
     } catch (err: unknown) {
       console.error(err);
       const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -135,11 +150,11 @@ export default function AuthPage() {
       localStorage.setItem("gariha_token", res.data.access_token);
       const userRes = await api.get("/auth/me");
       if (userRes.data.role === "admin") {
-        router.push('/admin');
+        router.push(getRedirectUrl('/admin'));
       } else if (userRes.data.role === "owner") {
-        router.push('/owner');
+        router.push(getRedirectUrl('/owner'));
       } else {
-        router.push('/driver');
+        router.push(getRedirectUrl('/driver'));
       }
     } catch (err: unknown) {
       console.error(err);
@@ -188,11 +203,11 @@ export default function AuthPage() {
       const user = userRes.data;
       
       if (user.role === "driver") {
-        router.push('/driver');
+        router.push(getRedirectUrl('/driver'));
       } else if (user.role === "admin") {
-        router.push('/admin');
+        router.push(getRedirectUrl('/admin'));
       } else if (user.status === "approved") {
-        router.push('/owner');
+        router.push(getRedirectUrl('/owner'));
       } else {
         setOwnerStep('pending');
       }

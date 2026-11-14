@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { requireUser, handleApiError } from "@/lib/auth";
+import { getCurrentUser, handleApiError } from "@/lib/auth";
 import { createReservationNotification } from "@/lib/reservations";
 
 export async function POST(
@@ -11,7 +11,8 @@ export async function POST(
   const client = await pool.connect();
 
   try {
-    const user = await requireUser(req);
+    const user = await getCurrentUser(req);
+    const body = await req.json().catch(() => ({}));
     const { id } = await params;
     const resId = parseInt(id, 10);
 
@@ -30,12 +31,19 @@ export async function POST(
 
     const res = resQuery.rows[0];
 
-    // Authorization: driver, owner, or admin
-    const isDriver = res.driver_id === user.id;
-    const isOwner = res.owner_id === user.id;
-    const isAdmin = user.role === "admin";
+    // Authorization check
+    let isAuthorized = false;
+    if (user) {
+      if (res.driver_id === user.id || res.owner_id === user.id || user.role === "admin") {
+        isAuthorized = true;
+      }
+    } else if (body.plate_number && res.driver_id === null) {
+      if (res.plate_number.trim().toUpperCase() === body.plate_number.trim().toUpperCase()) {
+        isAuthorized = true;
+      }
+    }
 
-    if (!isDriver && !isOwner && !isAdmin) {
+    if (!isAuthorized) {
       return NextResponse.json(
         { detail: "Forbidden: You are not authorized to cancel this reservation" },
         { status: 403 }
@@ -61,27 +69,20 @@ export async function POST(
       await createReservationNotification(
         res.driver_id,
         "Reservation Cancelled",
-        `Your reservation for spot ${res.spot_name} at ${res.parking_name} has been cancelled.`
+        `Your reservation #${res.id} for spot ${res.spot_name} at ${res.parking_name} has been cancelled.`
       );
     }
 
     return NextResponse.json({
-      id: res.id,
-      parking_spot_id: res.parking_spot_id,
-      driver_name: res.driver_name,
-      plate_number: res.plate_number,
+      message: "Reservation cancelled successfully. Spot is now free.",
+      reservation_id: resId,
       status: "cancelled",
-      created_at: res.created_at,
-      expires_at: res.expires_at,
-      spot_name: res.spot_name,
-      parking_name: res.parking_name,
-      message: "Réservation annulée avec succès. La place a été libérée.",
     });
   } catch (err) {
     try {
       await client.query("ROLLBACK");
     } catch {
-      // ignore
+      // ignore rollback error
     }
     return handleApiError(err);
   } finally {

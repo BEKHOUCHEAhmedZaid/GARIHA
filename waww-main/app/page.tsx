@@ -90,22 +90,16 @@ const LandingPage = () => {
           <div className="hidden md:flex items-center gap-3">
             <Link 
               href="/book" 
-              className="px-3.5 py-2 text-sm font-bold text-[#1A2FA8] hover:text-[#0F1E7A] transition-colors"
+              className="px-4 py-2 text-sm font-bold text-[#1A2FA8] hover:text-[#0F1E7A] transition-colors"
             >
-              Réserver
+              Find Parking
             </Link>
             <Link 
               href="/driver" 
-              className="px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              Mes réservations
-            </Link>
-            <Link 
-              href="/auth" 
               className="relative overflow-hidden px-5 py-2 rounded-full bg-slate-900 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(15,23,42,0.2)] hover:shadow-[0_8px_25px_rgba(15,23,42,0.3)] hover:-translate-y-0.5 transition-all duration-300 group"
             >
               <span className="relative z-10 flex items-center gap-1.5">
-                Connexion
+                Your Account
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -161,9 +155,13 @@ const LandingPage = () => {
               ))}
             </div>
             
-            <div className="mt-8">
-              <Link href="/auth" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-md shadow-[0_4px_20px_rgba(15,23,42,0.2)] transition-colors">
-                Get Started
+            <div className="mt-8 flex flex-col gap-3">
+              <Link href="/book" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-gradient-to-r from-[#0F1E7A] to-[#1A2FA8] text-white font-semibold text-md shadow-[0_4px_20px_rgba(15,30,122,0.2)] transition-all">
+                Find Parking
+                <Search size={18} />
+              </Link>
+              <Link href="/driver" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-md shadow-[0_4px_20px_rgba(15,23,42,0.2)] transition-colors">
+                Your Account
                 <ArrowRight size={18} />
               </Link>
             </div>
@@ -203,8 +201,8 @@ const LandingPage = () => {
                   Find Parking
                   <Search size={18} className="group-hover:scale-110 transition-transform" />
                 </Link>
-                <Link href="/auth" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white/80 backdrop-blur-sm text-[#1A2FA8] border-2 border-[#1A2FA8]/15 font-bold text-lg shadow-sm hover:shadow-lg hover:border-[#4DCCE7]/40 hover:bg-white hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
-                  Offer a Space
+                <Link href="/driver" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white/80 backdrop-blur-sm text-[#0F1E7A] border-2 border-[#0F1E7A]/15 font-bold text-lg shadow-sm hover:shadow-lg hover:border-[#1A2FA8]/40 hover:bg-white hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
+                  Your Account
                   <ArrowRight size={18} />
                 </Link>
               </motion.div>

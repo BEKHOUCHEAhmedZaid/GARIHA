@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { requireUser, handleApiError } from "@/lib/auth";
+import { getCurrentUser, handleApiError } from "@/lib/auth";
 import { createReservationNotification, expireStaleReservations } from "@/lib/reservations";
 
 export async function POST(
@@ -11,13 +11,13 @@ export async function POST(
   const client = await pool.connect();
 
   try {
-    const user = await requireUser(req);
+    const user = await getCurrentUser(req);
     await expireStaleReservations();
 
     const { id } = await params;
     const resId = parseInt(id, 10);
     const body = await req.json();
-    const { new_spot_id } = body;
+    const { new_spot_id, plate_number } = body;
 
     if (!new_spot_id) {
       return NextResponse.json(
@@ -58,12 +58,19 @@ export async function POST(
 
     const currentRes = checkRes.rows[0];
 
-    // 2. Strict authorization: user must be the driver, the parking owner, or admin
-    const isDriver = currentRes.driver_id === user.id;
-    const isOwner = currentRes.owner_id === user.id;
-    const isAdmin = user.role === "admin";
+    // 2. Authorization check
+    let isAuthorized = false;
+    if (user) {
+      if (currentRes.driver_id === user.id || currentRes.owner_id === user.id || user.role === "admin") {
+        isAuthorized = true;
+      }
+    } else if (plate_number && currentRes.driver_id === null) {
+      if (currentRes.plate_number.trim().toUpperCase() === plate_number.trim().toUpperCase()) {
+        isAuthorized = true;
+      }
+    }
 
-    if (!isDriver && !isOwner && !isAdmin) {
+    if (!isAuthorized) {
       return NextResponse.json(
         { detail: "Forbidden: You are not authorized to modify this reservation" },
         { status: 403 }
