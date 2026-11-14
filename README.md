@@ -90,7 +90,7 @@ npm test
 
 1. **Push your repository** to GitHub or GitLab.
 2. **Import the project in Vercel**:
-   * Set **Root Directory** to `waww-main`.
+   * Keep **Root Directory** at the repository root (default); do not select a subfolder.
    * Framework Preset: **Next.js**.
 3. **Configure Environment Variables in Vercel**:
    * `DATABASE_URL`: Your PostgreSQL connection string (from Vercel Postgres / Neon / Supabase).
